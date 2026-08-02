@@ -19,8 +19,10 @@ import {
   getApiBaseUrl,
   getToken,
   setApiBaseUrl,
+  setAuthUser,
   setToken,
 } from "@/lib/api";
+
 
 export function AppHeader() {
   const [open, setOpen] = useState(false);
