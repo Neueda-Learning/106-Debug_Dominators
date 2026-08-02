@@ -15,11 +15,10 @@ export const PAYMENT_TYPES = [
   "NORMAL",
   "CRYPTO",
   "INTERNATIONAL",
-  "CROWDFUNDING",
   "REFUND",
   "PAYOUT",
 ] as const;
-export const CURRENCIES = [
+export const FIAT_CURRENCIES = [
   "USD",
   "EUR",
   "GBP",
@@ -31,6 +30,31 @@ export const CURRENCIES = [
   "AED",
   "CHF",
 ] as const;
+export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "USDC", "SOL", "XRP"] as const;
+export const CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES] as const;
+
+/** Fee and tax are charged as a percentage of the payment amount. */
+export const FEE_RATES: Record<string, number> = {
+  BANK_TRANSFER: 0.5,
+  CARD: 2.5,
+  WALLET_BALANCE: 1,
+  CRYPTO_WALLET: 1.5,
+  INTERNAL_TRANSFER: 0,
+  MANUAL: 0,
+};
+export const TAX_RATES: Record<string, number> = {
+  USD: 0,
+  EUR: 20,
+  GBP: 20,
+  INR: 18,
+  JPY: 10,
+  AUD: 10,
+  CAD: 5,
+  SGD: 9,
+  AED: 5,
+  CHF: 8.1,
+};
+export const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
