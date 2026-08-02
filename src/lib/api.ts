@@ -205,7 +205,7 @@ export const api = {
   // PUT /api/payments/{id}/status
   updatePaymentStatus: (
     id: number | string,
-    data: { status: PaymentStatus; reasonCode?: string; reasonMessage?: string },
+    data: { status: PaymentStatus; reasonCode?: string | undefined; reasonMessage?: string | undefined },
   ) =>
     request<Payment>(`/api/payments/${id}/status`, {
       method: "PUT",

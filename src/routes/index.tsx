@@ -117,7 +117,7 @@ function PaymentsPage() {
         </div>
 
         <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="Total" value={counts.TOTAL ?? 0} />
+          <StatCard label="Total" value={counts["TOTAL"] ?? 0} />
           {PAYMENT_STATUSES.map((s) => (
             <StatCard key={s} label={s} value={counts[s] ?? 0} status={s} />
           ))}

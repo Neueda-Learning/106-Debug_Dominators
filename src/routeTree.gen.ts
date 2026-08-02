@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CrowdfundingRouteImport } from './routes/crowdfunding'
+import { Route as PaymentsPaymentIdRouteImport } from './routes/payments.$paymentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrowdfundingRoute = CrowdfundingRouteImport.update({
+  id: '/crowdfunding',
+  path: '/crowdfunding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaymentsPaymentIdRoute = PaymentsPaymentIdRouteImport.update({
+  id: '/payments/$paymentId',
+  path: '/payments/$paymentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/crowdfunding': typeof CrowdfundingRoute
+  '/payments/$paymentId': typeof PaymentsPaymentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/crowdfunding': typeof CrowdfundingRoute
+  '/payments/$paymentId': typeof PaymentsPaymentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/crowdfunding': typeof CrowdfundingRoute
+  '/payments/$paymentId': typeof PaymentsPaymentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/crowdfunding' | '/payments/$paymentId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/crowdfunding' | '/payments/$paymentId'
+  id: '__root__' | '/' | '/crowdfunding' | '/payments/$paymentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CrowdfundingRoute: typeof CrowdfundingRoute
+  PaymentsPaymentIdRoute: typeof PaymentsPaymentIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/crowdfunding': {
+      id: '/crowdfunding'
+      path: '/crowdfunding'
+      fullPath: '/crowdfunding'
+      preLoaderRoute: typeof CrowdfundingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/payments/$paymentId': {
+      id: '/payments/$paymentId'
+      path: '/payments/$paymentId'
+      fullPath: '/payments/$paymentId'
+      preLoaderRoute: typeof PaymentsPaymentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CrowdfundingRoute: CrowdfundingRoute,
+  PaymentsPaymentIdRoute: PaymentsPaymentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
