@@ -33,15 +33,61 @@ export const FIAT_CURRENCIES = [
 export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "USDC", "SOL", "XRP"] as const;
 export const CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES] as const;
 
-/** Fee and tax are charged as a percentage of the payment amount. */
-export const FEE_RATES: Record<string, number> = {
-  BANK_TRANSFER: 0.5,
-  CARD: 2.5,
-  WALLET_BALANCE: 1,
-  CRYPTO_WALLET: 1.5,
-  INTERNAL_TRANSFER: 0,
-  MANUAL: 0,
+/** UI-level payment options: each maps to a backend paymentType + paymentMethod pair. */
+export const PAYMENT_OPTIONS = [
+  {
+    id: "BANK_NATIONAL",
+    label: "Bank Transfer — National",
+    paymentType: "NORMAL",
+    paymentMethod: "BANK_TRANSFER",
+  },
+  {
+    id: "BANK_INTERNATIONAL",
+    label: "Bank Transfer — International",
+    paymentType: "INTERNATIONAL",
+    paymentMethod: "BANK_TRANSFER",
+  },
+  { id: "CREDIT_CARD", label: "Credit Card", paymentType: "NORMAL", paymentMethod: "CARD" },
+  { id: "UPI", label: "UPI", paymentType: "NORMAL", paymentMethod: "WALLET_BALANCE" },
+  { id: "CRYPTO", label: "Crypto", paymentType: "CRYPTO", paymentMethod: "CRYPTO_WALLET" },
+] as const;
+
+export type PaymentOptionId = (typeof PAYMENT_OPTIONS)[number]["id"];
+
+/** Rough USD equivalents used only to bucket the amount into a fee tier. */
+export const USD_RATES: Record<string, number> = {
+  USD: 1,
+  EUR: 1.08,
+  GBP: 1.27,
+  INR: 0.012,
+  JPY: 0.0064,
+  AUD: 0.66,
+  CAD: 0.73,
+  SGD: 0.74,
+  AED: 0.27,
+  CHF: 1.12,
+  BTC: 65000,
+  ETH: 3400,
+  USDT: 1,
+  USDC: 1,
+  SOL: 150,
+  XRP: 0.55,
 };
+
+/**
+ * Tiered fee: free under $100 equivalent, 0.5% up to $1,000, 0.75% above.
+ */
+export const FEE_TIERS = [
+  { maxUsd: 100, rate: 0 },
+  { maxUsd: 1000, rate: 0.5 },
+  { maxUsd: Infinity, rate: 0.75 },
+];
+
+export function feeRateFor(amount: number, currencyCode: string) {
+  const usd = (Number(amount) || 0) * (USD_RATES[currencyCode] ?? 1);
+  return FEE_TIERS.find((t) => usd < t.maxUsd)?.rate ?? 0.75;
+}
+
 export const TAX_RATES: Record<string, number> = {
   USD: 0,
   EUR: 20,
@@ -55,6 +101,7 @@ export const TAX_RATES: Record<string, number> = {
   CHF: 8.1,
 };
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -170,6 +217,25 @@ export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
 }
+
+const USER_KEY = "pp.user";
+export type AuthUser = { userId: number; email: string; role: string };
+
+export function setAuthUser(user: AuthUser | null) {
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
+}
+export function getAuthUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
