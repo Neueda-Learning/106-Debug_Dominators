@@ -143,7 +143,9 @@ export function AppHeader() {
                     variant="ghost"
                     onClick={() => {
                       setToken(null);
+                      setAuthUser(null);
                       setHasToken(false);
+
                       toast.success("Token cleared");
                     }}
                   >
