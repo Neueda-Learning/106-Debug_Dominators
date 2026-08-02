@@ -30,7 +30,7 @@ export const Route = createFileRoute("/crowdfunding")({
       },
     ],
   }),
-  component: CrowdfundingPage;
+  component: CrowdfundingPage,
 });
 
 const PRESETS = ["100", "250", "500", "custom"];
