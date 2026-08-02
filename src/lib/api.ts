@@ -172,7 +172,9 @@ function safeJson(text: string) {
   try {
     return JSON.parse(text);
   } catch {
-    return { message: text };
+    // Non-JSON body (e.g. an HTML error page): keep it short and readable.
+    const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return { message: plain.slice(0, 180) || "Unexpected non-JSON response" };
   }
 }
 
