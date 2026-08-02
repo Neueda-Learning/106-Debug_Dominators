@@ -48,8 +48,10 @@ export function AppHeader() {
       setApiBaseUrl(baseUrl);
       const res = await api.login(email, password);
       setToken(res.token);
+      setAuthUser({ userId: res.userId, email: res.email, role: res.role });
       setHasToken(true);
       toast.success(`Signed in as ${res.email} (${res.role})`);
+
       setOpen(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Login failed");
