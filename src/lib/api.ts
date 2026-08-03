@@ -102,6 +102,16 @@ export const TAX_RATES: Record<string, number> = {
 };
 export const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Convert between any two supported currencies using the indicative USD rates. */
+export function convertAmount(amount: number, from: string, to: string) {
+  const usd = (Number(amount) || 0) * (USD_RATES[from] ?? 1);
+  const rate = USD_RATES[to] ?? 1;
+  return round2(usd / rate);
+}
+
+export const isCryptoCurrency = (code: string) =>
+  (CRYPTO_CURRENCIES as readonly string[]).includes(code);
+
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];

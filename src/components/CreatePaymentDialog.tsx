@@ -29,8 +29,10 @@ import {
   PAYMENT_OPTIONS,
   TAX_RATES,
   api,
+  convertAmount,
   feeRateFor,
   getAuthUser,
+  isCryptoCurrency,
   round2,
   type PaymentOptionId,
   type CreatePaymentRequest,
@@ -71,16 +73,27 @@ export function CreatePaymentDialog({
   const [cardExpiry, setCardExpiry] = useState("");
   const [upiId, setUpiId] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
+  const [upiUtr, setUpiUtr] = useState<string | null>(null);
 
   useEffect(() => {
     setPayerAccountId(getAuthUser()?.userId ?? null);
   }, [open]);
+
+  // Any change to the charged amount, payee VPA or method invalidates a simulated UPI receipt.
+  useEffect(() => {
+    setUpiUtr(null);
+  }, [amount, upiId, optionId, sourceCurrencyCode]);
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
   const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
   const bankMode_ = option.paymentMethod === "BANK_TRANSFER";
   const cardMode = option.paymentMethod === "CARD";
   const upiMode = optionId === "UPI";
+  const settlementIsCrypto = isCryptoCurrency(settlementCurrencyCode);
+  const cryptoNeedsBank = cryptoMode && !settlementIsCrypto;
+  const needsBankDetails = bankMode_ || cryptoNeedsBank;
 
   const feeRate = feeRateFor(amount, sourceCurrencyCode);
   const taxRate = TAX_RATES[sourceCurrencyCode] ?? 0;
@@ -91,6 +104,15 @@ export function CreatePaymentDialog({
     const tax = round2((base * taxRate) / 100);
     return { feeAmount: fee, taxAmount: tax, total: round2(base + fee + tax) };
   }, [amount, feeRate, taxRate]);
+
+  const settlementAmount = useMemo(
+    () => convertAmount(amount, sourceCurrencyCode, settlementCurrencyCode),
+    [amount, sourceCurrencyCode, settlementCurrencyCode],
+  );
+  const settlementTotal = useMemo(
+    () => convertAmount(total, sourceCurrencyCode, settlementCurrencyCode),
+    [total, sourceCurrencyCode, settlementCurrencyCode],
+  );
 
   const upiPayload = useMemo(() => {
     const pa = upiId.trim() || "merchant@ledger";
@@ -118,11 +140,18 @@ export function CreatePaymentDialog({
     });
   };
 
+  const bankDetail = () =>
+    `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
+
   const methodDetail = () => {
-    if (bankMode_) return `Bank transfer mode: ${bankMode}`;
+    if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
-    if (cryptoMode) return `Wallet: ${walletAddress.trim()}`;
+    if (upiMode)
+      return `UPI: ${upiId.trim() || "merchant@ledger"} · UTR ${upiUtr ?? "PENDING"}`;
+    if (cryptoMode)
+      return cryptoNeedsBank
+        ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
+        : `Wallet: ${walletAddress.trim()}`;
     return "";
   };
 
@@ -155,10 +184,14 @@ export function CreatePaymentDialog({
 
   const cardValid =
     /^\d{3,4}$/.test(cardCvv) && /^\d{3}$/.test(cardLast3) && /^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry);
+  const bankValid =
+    bankAccountNumber.trim().length >= 6 && ifscCode.trim().length >= 6;
   const invalid =
     amount <= 0 ||
     (payeeAccountId !== null && payeeAccountId < 0) ||
     (cardMode && !cardValid) ||
+    (needsBankDetails && !bankValid) ||
+    (upiMode && !upiUtr) ||
     (cryptoMode && walletAddress.trim().length < 8);
 
   return (
@@ -271,6 +304,52 @@ export function CreatePaymentDialog({
             </Field>
           ) : null}
 
+          {needsBankDetails ? (
+            <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+              <Field
+                label={cryptoNeedsBank ? "Payout bank account number" : "Payer bank account number"}
+                hint="6–18 digits"
+              >
+                <Input
+                  inputMode="numeric"
+                  value={bankAccountNumber}
+                  onChange={(e) =>
+                    setBankAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 18))
+                  }
+                  placeholder="123456789012"
+                  className="font-mono"
+                />
+              </Field>
+              <Field
+                label={bankMode === "SWIFT" ? "IFSC / SWIFT code" : "IFSC code"}
+                hint="e.g. HDFC0001234"
+              >
+                <Input
+                  value={ifscCode}
+                  onChange={(e) => setIfscCode(e.target.value.toUpperCase().slice(0, 11))}
+                  placeholder="HDFC0001234"
+                  className="font-mono"
+                />
+              </Field>
+              {cryptoNeedsBank ? (
+                <div className="sm:col-span-2 grid gap-1 border-t border-border pt-2">
+                  <Row
+                    label={`Converted amount (${sourceCurrencyCode} → ${settlementCurrencyCode})`}
+                    value={`${settlementAmount} ${settlementCurrencyCode}`}
+                  />
+                  <Row
+                    label="Bank credit incl. fee & tax"
+                    value={`${settlementTotal} ${settlementCurrencyCode}`}
+                    strong
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Crypto is sold at the indicative rate and settled to this bank account.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {cardMode ? (
             <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
               <Field label="CVV" hint="3–4 digits">
@@ -323,10 +402,31 @@ export function CreatePaymentDialog({
                   </span>{" "}
                   (total charged). The QR updates as the amount changes.
                 </p>
+                {upiUtr ? (
+                  <p className="text-xs text-emerald-400">
+                    Collection confirmed — UTR{" "}
+                    <span className="font-mono">{upiUtr}</span>. Create the payment to record it.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Simulation: a real UPI app would call our webhook. Here, confirm the collection
+                    manually to mint a mock UTR.
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant={upiUtr ? "secondary" : "default"}
+                  size="sm"
+                  onClick={() => setUpiUtr(randomRef("UTR"))}
+                  disabled={!!upiUtr || total <= 0}
+                >
+                  {upiUtr ? "Payment confirmed" : "I've paid — confirm collection"}
+                </Button>
               </div>
               <div className="justify-self-center rounded-md bg-white p-3">
                 <QRCodeSVG value={upiPayload} size={132} level="M" />
               </div>
+
             </div>
           ) : null}
 
