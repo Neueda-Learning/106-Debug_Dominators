@@ -304,6 +304,52 @@ export function CreatePaymentDialog({
             </Field>
           ) : null}
 
+          {needsBankDetails ? (
+            <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+              <Field
+                label={cryptoNeedsBank ? "Payout bank account number" : "Payer bank account number"}
+                hint="6–18 digits"
+              >
+                <Input
+                  inputMode="numeric"
+                  value={bankAccountNumber}
+                  onChange={(e) =>
+                    setBankAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 18))
+                  }
+                  placeholder="123456789012"
+                  className="font-mono"
+                />
+              </Field>
+              <Field
+                label={bankMode === "SWIFT" ? "IFSC / SWIFT code" : "IFSC code"}
+                hint="e.g. HDFC0001234"
+              >
+                <Input
+                  value={ifscCode}
+                  onChange={(e) => setIfscCode(e.target.value.toUpperCase().slice(0, 11))}
+                  placeholder="HDFC0001234"
+                  className="font-mono"
+                />
+              </Field>
+              {cryptoNeedsBank ? (
+                <div className="sm:col-span-2 grid gap-1 border-t border-border pt-2">
+                  <Row
+                    label={`Converted amount (${sourceCurrencyCode} → ${settlementCurrencyCode})`}
+                    value={`${settlementAmount} ${settlementCurrencyCode}`}
+                  />
+                  <Row
+                    label="Bank credit incl. fee & tax"
+                    value={`${settlementTotal} ${settlementCurrencyCode}`}
+                    strong
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Crypto is sold at the indicative rate and settled to this bank account.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           {cardMode ? (
             <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
               <Field label="CVV" hint="3–4 digits">
