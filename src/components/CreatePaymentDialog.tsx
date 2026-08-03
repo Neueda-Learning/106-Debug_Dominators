@@ -81,6 +81,11 @@ export function CreatePaymentDialog({
     setPayerAccountId(getAuthUser()?.userId ?? null);
   }, [open]);
 
+  // Any change to the charged amount, payee VPA or method invalidates a simulated UPI receipt.
+  useEffect(() => {
+    setUpiUtr(null);
+  }, [amount, upiId, optionId, sourceCurrencyCode]);
+
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
   const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
   const bankMode_ = option.paymentMethod === "BANK_TRANSFER";
