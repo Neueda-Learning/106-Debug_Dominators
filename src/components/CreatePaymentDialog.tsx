@@ -179,10 +179,14 @@ export function CreatePaymentDialog({
 
   const cardValid =
     /^\d{3,4}$/.test(cardCvv) && /^\d{3}$/.test(cardLast3) && /^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry);
+  const bankValid =
+    bankAccountNumber.trim().length >= 6 && ifscCode.trim().length >= 6;
   const invalid =
     amount <= 0 ||
     (payeeAccountId !== null && payeeAccountId < 0) ||
     (cardMode && !cardValid) ||
+    (needsBankDetails && !bankValid) ||
+    (upiMode && !upiUtr) ||
     (cryptoMode && walletAddress.trim().length < 8);
 
   return (
