@@ -73,6 +73,9 @@ export function CreatePaymentDialog({
   const [cardExpiry, setCardExpiry] = useState("");
   const [upiId, setUpiId] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
+  const [upiUtr, setUpiUtr] = useState<string | null>(null);
 
   useEffect(() => {
     setPayerAccountId(getAuthUser()?.userId ?? null);
