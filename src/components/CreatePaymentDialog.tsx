@@ -135,11 +135,18 @@ export function CreatePaymentDialog({
     });
   };
 
+  const bankDetail = () =>
+    `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
+
   const methodDetail = () => {
-    if (bankMode_) return `Bank transfer mode: ${bankMode}`;
+    if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
-    if (cryptoMode) return `Wallet: ${walletAddress.trim()}`;
+    if (upiMode)
+      return `UPI: ${upiId.trim() || "merchant@ledger"} · UTR ${upiUtr ?? "PENDING"}`;
+    if (cryptoMode)
+      return cryptoNeedsBank
+        ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
+        : `Wallet: ${walletAddress.trim()}`;
     return "";
   };
 
