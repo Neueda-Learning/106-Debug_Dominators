@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,14 @@ function randomRef(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
 
+const BANK_MODES = [
+  { id: "NEFT", label: "NEFT" },
+  { id: "IMPS", label: "IMPS" },
+  { id: "RTGS", label: "RTGS" },
+  { id: "SWIFT", label: "SWIFT (international)" },
+  { id: "OTHER", label: "Other bank transfer" },
+] as const;
+
 export function CreatePaymentDialog({
   open,
   onOpenChange,
@@ -55,12 +64,23 @@ export function CreatePaymentDialog({
   const [settlementCurrencyCode, setSettlementCurrencyCode] = useState("USD");
   const [description, setDescription] = useState("");
 
+  // Method-specific fields
+  const [bankMode, setBankMode] = useState<string>("NEFT");
+  const [cardCvv, setCardCvv] = useState("");
+  const [cardLast3, setCardLast3] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [upiId, setUpiId] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+
   useEffect(() => {
     setPayerAccountId(getAuthUser()?.userId ?? null);
   }, [open]);
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
   const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
+  const bankMode_ = option.paymentMethod === "BANK_TRANSFER";
+  const cardMode = option.paymentMethod === "CARD";
+  const upiMode = optionId === "UPI";
 
   const feeRate = feeRateFor(amount, sourceCurrencyCode);
   const taxRate = TAX_RATES[sourceCurrencyCode] ?? 0;
@@ -72,20 +92,43 @@ export function CreatePaymentDialog({
     return { feeAmount: fee, taxAmount: tax, total: round2(base + fee + tax) };
   }, [amount, feeRate, taxRate]);
 
+  const upiPayload = useMemo(() => {
+    const pa = upiId.trim() || "merchant@ledger";
+    const params = new URLSearchParams({
+      pa,
+      pn: "Ledger Payments",
+      am: total.toFixed(2),
+      cu: sourceCurrencyCode === "INR" ? "INR" : sourceCurrencyCode,
+      tn: description.trim() || "Ledger payment",
+    });
+    return `upi://pay?${params.toString()}`;
+  }, [upiId, total, sourceCurrencyCode, description]);
+
   const onOptionChange = (id: PaymentOptionId) => {
     setOptionId(id);
     const next = PAYMENT_OPTIONS.find((o) => o.id === id)!;
     const nextCrypto = next.paymentMethod === "CRYPTO_WALLET";
+    setBankMode(id === "BANK_INTERNATIONAL" ? "SWIFT" : "NEFT");
     setSourceCurrencyCode((cur) => {
       const isCryptoCur = (CRYPTO_CURRENCIES as readonly string[]).includes(cur);
       if (nextCrypto && !isCryptoCur) return "BTC";
       if (!nextCrypto && isCryptoCur) return "USD";
+      if (id === "UPI") return "INR";
       return cur;
     });
   };
 
+  const methodDetail = () => {
+    if (bankMode_) return `Bank transfer mode: ${bankMode}`;
+    if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
+    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
+    if (cryptoMode) return `Wallet: ${walletAddress.trim()}`;
+    return "";
+  };
+
   const mutation = useMutation({
     mutationFn: () => {
+      const detail = methodDetail();
       const payload: CreatePaymentRequest = {
         paymentRef: randomRef("PAY"),
         idempotencyKey: randomRef("IDEM"),
@@ -96,7 +139,7 @@ export function CreatePaymentDialog({
         amount,
         sourceCurrencyCode,
         settlementCurrencyCode,
-        description,
+        description: [description.trim(), detail].filter(Boolean).join(" — "),
         feeAmount,
         taxAmount,
       };
@@ -110,7 +153,13 @@ export function CreatePaymentDialog({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create payment"),
   });
 
-  const invalid = amount <= 0 || (payeeAccountId !== null && payeeAccountId < 0);
+  const cardValid =
+    /^\d{3,4}$/.test(cardCvv) && /^\d{3}$/.test(cardLast3) && /^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry);
+  const invalid =
+    amount <= 0 ||
+    (payeeAccountId !== null && payeeAccountId < 0) ||
+    (cardMode && !cardValid) ||
+    (cryptoMode && walletAddress.trim().length < 8);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,17 +172,6 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Paying from" hint="signed-in account">
-            <Input
-              readOnly
-              value={
-                payerAccountId === null
-                  ? "Not signed in — use Connect API"
-                  : `Account #${payerAccountId}`
-              }
-              className="font-mono"
-            />
-          </Field>
           <Field label="Payee account ID">
             <Input
               type="number"
@@ -214,6 +252,97 @@ export function CreatePaymentDialog({
               </SelectContent>
             </Select>
           </Field>
+
+          {/* Method-specific details */}
+          {bankMode_ ? (
+            <Field label="Bank transfer mode" hint="clearing network">
+              <Select value={bankMode} onValueChange={setBankMode}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BANK_MODES.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
+
+          {cardMode ? (
+            <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-3">
+              <Field label="CVV" hint="3–4 digits">
+                <Input
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={cardCvv}
+                  onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="123"
+                />
+              </Field>
+              <Field label="Last 3 digits" hint="of account number">
+                <Input
+                  inputMode="numeric"
+                  maxLength={3}
+                  value={cardLast3}
+                  onChange={(e) => setCardLast3(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                  placeholder="789"
+                />
+              </Field>
+              <Field label="Expiry date" hint="MM/YY">
+                <Input
+                  value={cardExpiry}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setCardExpiry(
+                      digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits,
+                    );
+                  }}
+                  placeholder="09/28"
+                />
+              </Field>
+            </div>
+          ) : null}
+
+          {upiMode ? (
+            <div className="sm:col-span-2 grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div className="space-y-3">
+                <Field label="UPI ID" hint="payee VPA">
+                  <Input
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="merchant@upi"
+                  />
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  Scan to pay{" "}
+                  <span className="font-mono text-foreground">
+                    {total} {sourceCurrencyCode}
+                  </span>{" "}
+                  (total charged). The QR updates as the amount changes.
+                </p>
+              </div>
+              <div className="justify-self-center rounded-md bg-white p-3">
+                <QRCodeSVG value={upiPayload} size={132} level="M" />
+              </div>
+            </div>
+          ) : null}
+
+          {cryptoMode ? (
+            <div className="sm:col-span-2">
+              <Field label="Destination wallet address" hint={sourceCurrencyCode}>
+                <Input
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                  placeholder="0x… / bc1…"
+                  className="font-mono"
+                />
+              </Field>
+            </div>
+          ) : null}
+
           <div className="sm:col-span-2 grid gap-2 rounded-md border border-border p-3 text-sm">
             <Row label={`Fee (${feeRate}%)`} value={`${feeAmount} ${sourceCurrencyCode}`} />
             <Row label={`Tax (${taxRate}%)`} value={`${taxAmount} ${sourceCurrencyCode}`} />
