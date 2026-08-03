@@ -86,6 +86,9 @@ export function CreatePaymentDialog({
   const bankMode_ = option.paymentMethod === "BANK_TRANSFER";
   const cardMode = option.paymentMethod === "CARD";
   const upiMode = optionId === "UPI";
+  const settlementIsCrypto = isCryptoCurrency(settlementCurrencyCode);
+  const cryptoNeedsBank = cryptoMode && !settlementIsCrypto;
+  const needsBankDetails = bankMode_ || cryptoNeedsBank;
 
   const feeRate = feeRateFor(amount, sourceCurrencyCode);
   const taxRate = TAX_RATES[sourceCurrencyCode] ?? 0;
@@ -96,6 +99,15 @@ export function CreatePaymentDialog({
     const tax = round2((base * taxRate) / 100);
     return { feeAmount: fee, taxAmount: tax, total: round2(base + fee + tax) };
   }, [amount, feeRate, taxRate]);
+
+  const settlementAmount = useMemo(
+    () => convertAmount(amount, sourceCurrencyCode, settlementCurrencyCode),
+    [amount, sourceCurrencyCode, settlementCurrencyCode],
+  );
+  const settlementTotal = useMemo(
+    () => convertAmount(total, sourceCurrencyCode, settlementCurrencyCode),
+    [total, sourceCurrencyCode, settlementCurrencyCode],
+  );
 
   const upiPayload = useMemo(() => {
     const pa = upiId.trim() || "merchant@ledger";
