@@ -429,26 +429,12 @@ export function CreatePaymentDialog({
                   </span>{" "}
                   (total charged). The QR updates as the amount changes.
                 </p>
-                {upiUtr ? (
-                  <p className="text-xs text-emerald-400">
-                    Collection confirmed — UTR{" "}
-                    <span className="font-mono">{upiUtr}</span>. Create the payment to record it.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Simulation: a real UPI app would call our webhook. Here, confirm the collection
-                    manually to mint a mock UTR.
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  variant={upiUtr ? "secondary" : "default"}
-                  size="sm"
-                  onClick={() => setUpiUtr(randomRef("UTR"))}
-                  disabled={!!upiUtr || total <= 0}
-                >
-                  {upiUtr ? "Payment confirmed" : "I've paid — confirm collection"}
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  On “Create payment” the backend records it as pending, this screen shows the QR
+                  and polls <span className="font-mono">GET /api/payments/{"{id}"}</span> every 2s
+                  until the status changes.
+                </p>
+
               </div>
               <div className="justify-self-center rounded-md bg-white p-3">
                 <QRCodeSVG value={upiPayload} size={132} level="M" />
