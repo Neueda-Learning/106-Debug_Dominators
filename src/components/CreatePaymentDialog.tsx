@@ -79,16 +79,34 @@ export function CreatePaymentDialog({
   const [walletAddress, setWalletAddress] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [ifscCode, setIfscCode] = useState("");
-  const [upiUtr, setUpiUtr] = useState<string | null>(null);
+  // UPI: after creating the payment we wait for the backend to confirm collection.
+  const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
     setPayerAccountId(getAuthUser()?.userId ?? null);
+    if (open) setAwaitingPayment(null);
   }, [open]);
 
-  // Any change to the charged amount, payee VPA or method invalidates a simulated UPI receipt.
+  const poll = useQuery({
+    queryKey: ["payments", awaitingPayment?.paymentId, "poll"],
+    queryFn: () => api.getPayment(awaitingPayment!.paymentId),
+    enabled: !!awaitingPayment,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "COMPLETED" || s === "FAILED" ? false : 2000;
+    },
+  });
+
+  const liveStatus = poll.data?.status ?? awaitingPayment?.status ?? null;
+  const settled = liveStatus === "COMPLETED" || liveStatus === "FAILED";
+
   useEffect(() => {
-    setUpiUtr(null);
-  }, [amount, upiId, optionId, sourceCurrencyCode]);
+    if (!awaitingPayment || !settled) return;
+    queryClient.invalidateQueries({ queryKey: ["payments"] });
+    if (liveStatus === "COMPLETED") toast.success("UPI collection confirmed");
+    else toast.error("UPI collection failed");
+  }, [settled, liveStatus, awaitingPayment, queryClient]);
+
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
   const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
