@@ -218,10 +218,68 @@ export function CreatePaymentDialog({
     (cardMode && !cardValid) ||
     (needsBankDetails && !bankValid) ||
     (upiMode && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(upiId.trim())) ||
-
     (cryptoMode && walletAddress.trim().length < 8);
 
+  if (awaitingPayment) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {liveStatus === "COMPLETED"
+                ? "Payment received"
+                : liveStatus === "FAILED"
+                  ? "Payment failed"
+                  : "Waiting for payment confirmation…"}
+            </DialogTitle>
+            <DialogDescription>
+              {awaitingPayment.paymentRef} · {total} {sourceCurrencyCode} to{" "}
+              {upiId.trim() || "merchant@ledger"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            {settled ? (
+              liveStatus === "COMPLETED" ? (
+                <CheckCircle2 className="size-14 text-emerald-400" />
+              ) : (
+                <XCircle className="size-14 text-destructive" />
+              )
+            ) : (
+              <>
+                <div className="rounded-md bg-white p-3">
+                  <QRCodeSVG value={upiPayload} size={148} level="M" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Waiting for payment confirmation…
+                </div>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Status <span className="font-mono text-foreground">{liveStatus}</span> · polling every
+              2s
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant={settled ? "default" : "ghost"}
+              onClick={() => {
+                setAwaitingPayment(null);
+                onOpenChange(false);
+              }}
+            >
+              {settled ? "Done" : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
+
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
