@@ -1,4 +1,7 @@
+import { mockApi } from "./mock";
+
 // Typed client for the Spring Boot Payment Processing API (see selfproject backend).
+
 // Base URL and JWT are stored in localStorage so the page can point at any
 // running backend instance (default: http://localhost:8080).
 
