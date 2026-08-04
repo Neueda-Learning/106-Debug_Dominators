@@ -107,10 +107,20 @@ function PaymentsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                mockApi.resetDemoData();
+                query.refetch();
+              }}
+            >
+              Reset demo data
+            </Button>
             <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
               <RefreshCw className={`mr-1.5 size-4 ${query.isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-1.5 size-4" />
               New payment
