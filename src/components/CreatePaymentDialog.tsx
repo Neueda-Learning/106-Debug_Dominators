@@ -174,16 +174,18 @@ export function CreatePaymentDialog({
     `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
 
   const methodDetail = () => {
-    if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
-    if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
+    const to = `To ${accountName(payeeAccountId)}`;
+    if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
+    if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
+    if (upiMode) return `${to} · UPI: ${upiId.trim() || "merchant@ledger"}`;
 
     if (cryptoMode)
       return cryptoNeedsBank
-        ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
-        : `Wallet: ${walletAddress.trim()}`;
-    return "";
+        ? `${to} · Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
+        : `${to} · Wallet: ${walletAddress.trim()}`;
+    return to;
   };
+
 
   const mutation = useMutation({
     mutationFn: () => {
