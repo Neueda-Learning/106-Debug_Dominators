@@ -505,10 +505,10 @@ export function CreatePaymentDialog({
                   (total charged). The QR updates as the amount changes.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  On “Create payment” the backend records it as pending, this screen shows the QR
-                  and polls <span className="font-mono">GET /api/payments/{"{id}"}</span> every 2s
-                  until the status changes.
+                  On “Create payment” the collection is recorded as pending, the QR is shown with a
+                  spinner, and the payment settles to COMPLETED after ~5 seconds.
                 </p>
+
 
               </div>
               <div className="justify-self-center rounded-md bg-white p-3">
