@@ -197,7 +197,9 @@ function PaymentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference</TableHead>
+                  <TableHead>Parties</TableHead>
                   <TableHead>Status</TableHead>
+
                   <TableHead>Type / Method</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Created</TableHead>
