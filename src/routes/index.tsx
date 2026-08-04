@@ -227,7 +227,12 @@ function PaymentRow({ payment }: { payment: Payment }) {
         <div className="font-mono text-xs">{payment.paymentRef}</div>
         <div className="mono-tag">#{payment.paymentId}</div>
       </TableCell>
+      <TableCell className="text-xs">
+        <div>{accountName(payment.payerAccountId)}</div>
+        <div className="text-muted-foreground">→ {accountName(payment.payeeAccountId)}</div>
+      </TableCell>
       <TableCell>
+
         <StatusBadge status={payment.status} />
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">
