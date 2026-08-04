@@ -267,9 +267,10 @@ export function CreatePaymentDialog({
               </>
             )}
             <p className="text-xs text-muted-foreground">
-              Status <span className="font-mono text-foreground">{liveStatus}</span> · polling every
-              2s
+              Status <span className="font-mono text-foreground">{liveStatus}</span> · settles
+              automatically in ~5s
             </p>
+
           </div>
 
           <DialogFooter>
