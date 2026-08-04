@@ -38,7 +38,9 @@ import {
   round2,
   type PaymentOptionId,
   type CreatePaymentRequest,
+  type Payment,
 } from "@/lib/api";
+
 
 function randomRef(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
