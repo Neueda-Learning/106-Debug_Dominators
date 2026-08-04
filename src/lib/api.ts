@@ -278,7 +278,18 @@ function safeJson(text: string) {
   }
 }
 
+const DEMO_KEY = "pp.demoMode";
+/** Demo mode serves data from the in-browser demo store (no backend required). */
+export function isDemoMode() {
+  if (typeof window === "undefined") return true;
+  return localStorage.getItem(DEMO_KEY) !== "off";
+}
+export function setDemoMode(on: boolean) {
+  localStorage.setItem(DEMO_KEY, on ? "on" : "off");
+}
+
 export const api = {
+
   // POST /api/auth/login
   login: (email: string, password: string) =>
     request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
