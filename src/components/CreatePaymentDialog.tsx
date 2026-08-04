@@ -168,8 +168,8 @@ export function CreatePaymentDialog({
   const methodDetail = () => {
     if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode)
-      return `UPI: ${upiId.trim() || "merchant@ledger"} · UTR ${upiUtr ?? "PENDING"}`;
+    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
+
     if (cryptoMode)
       return cryptoNeedsBank
         ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
