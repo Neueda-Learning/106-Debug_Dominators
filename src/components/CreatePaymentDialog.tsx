@@ -293,18 +293,24 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Payee account ID">
-            <Input
-              type="number"
-              min={0}
-              value={payeeAccountId ?? ""}
-              onChange={(e) =>
-                setPayeeAccountId(
-                  e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
-                )
-              }
-            />
+          <Field label="Pay to" hint="demo accounts">
+            <Select
+              value={String(payeeAccountId ?? "")}
+              onValueChange={(v) => setPayeeAccountId(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEMO_ACCOUNTS.filter((a) => a.accountId !== payerAccountId).map((a) => (
+                  <SelectItem key={a.accountId} value={String(a.accountId)}>
+                    {a.name} · {a.bank}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
+
           <Field label="Payment type">
             <Select value={optionId} onValueChange={(v) => onOptionChange(v as PaymentOptionId)}>
               <SelectTrigger>
