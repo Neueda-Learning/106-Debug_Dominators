@@ -30,6 +30,8 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
+import { accountName, mockApi } from "@/lib/mock";
+
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -105,10 +107,20 @@ function PaymentsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                mockApi.resetDemoData();
+                query.refetch();
+              }}
+            >
+              Reset demo data
+            </Button>
             <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
               <RefreshCw className={`mr-1.5 size-4 ${query.isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="mr-1.5 size-4" />
               New payment
@@ -185,7 +197,9 @@ function PaymentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference</TableHead>
+                  <TableHead>Parties</TableHead>
                   <TableHead>Status</TableHead>
+
                   <TableHead>Type / Method</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                   <TableHead>Created</TableHead>
@@ -213,7 +227,12 @@ function PaymentRow({ payment }: { payment: Payment }) {
         <div className="font-mono text-xs">{payment.paymentRef}</div>
         <div className="mono-tag">#{payment.paymentId}</div>
       </TableCell>
+      <TableCell className="text-xs">
+        <div>{accountName(payment.payerAccountId)}</div>
+        <div className="text-muted-foreground">→ {accountName(payment.payeeAccountId)}</div>
+      </TableCell>
       <TableCell>
+
         <StatusBadge status={payment.status} />
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">

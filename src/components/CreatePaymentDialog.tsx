@@ -40,6 +40,8 @@ import {
   type CreatePaymentRequest,
   type Payment,
 } from "@/lib/api";
+import { DEMO_ACCOUNTS, accountName } from "@/lib/mock";
+
 
 
 function randomRef(prefix: string) {
@@ -62,9 +64,10 @@ export function CreatePaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [payerAccountId, setPayerAccountId] = useState<number | null>(null);
+  const [payerAccountId, setPayerAccountId] = useState<number | null>(DEMO_ACCOUNTS[0]!.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
   const [payeeAccountId, setPayeeAccountId] = useState<number | null>(2);
+
   const [amount, setAmount] = useState(100);
   const [sourceCurrencyCode, setSourceCurrencyCode] = useState("USD");
   const [settlementCurrencyCode, setSettlementCurrencyCode] = useState("USD");
@@ -83,7 +86,11 @@ export function CreatePaymentDialog({
   const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
-    setPayerAccountId(getAuthUser()?.userId ?? null);
+    const me = getAuthUser()?.userId ?? DEMO_ACCOUNTS[0]!.accountId;
+    setPayerAccountId(me);
+    setPayeeAccountId((p) =>
+      p === null || p === me ? (DEMO_ACCOUNTS.find((a) => a.accountId !== me)?.accountId ?? null) : p,
+    );
     if (open) setAwaitingPayment(null);
   }, [open]);
 
@@ -93,8 +100,9 @@ export function CreatePaymentDialog({
     enabled: !!awaitingPayment,
     refetchInterval: (q) => {
       const s = q.state.data?.status;
-      return s === "COMPLETED" || s === "FAILED" ? false : 2000;
+      return s === "COMPLETED" || s === "FAILED" ? false : 1000;
     },
+
   });
 
   const liveStatus = poll.data?.status ?? awaitingPayment?.status ?? null;
@@ -166,16 +174,18 @@ export function CreatePaymentDialog({
     `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
 
   const methodDetail = () => {
-    if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
-    if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
+    const to = `To ${accountName(payeeAccountId)}`;
+    if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
+    if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
+    if (upiMode) return `${to} · UPI: ${upiId.trim() || "merchant@ledger"}`;
 
     if (cryptoMode)
       return cryptoNeedsBank
-        ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
-        : `Wallet: ${walletAddress.trim()}`;
-    return "";
+        ? `${to} · Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
+        : `${to} · Wallet: ${walletAddress.trim()}`;
+    return to;
   };
+
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -257,9 +267,10 @@ export function CreatePaymentDialog({
               </>
             )}
             <p className="text-xs text-muted-foreground">
-              Status <span className="font-mono text-foreground">{liveStatus}</span> · polling every
-              2s
+              Status <span className="font-mono text-foreground">{liveStatus}</span> · settles
+              automatically in ~5s
             </p>
+
           </div>
 
           <DialogFooter>
@@ -290,18 +301,24 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Payee account ID">
-            <Input
-              type="number"
-              min={0}
-              value={payeeAccountId ?? ""}
-              onChange={(e) =>
-                setPayeeAccountId(
-                  e.target.value === "" ? null : Math.max(0, Number(e.target.value)),
-                )
-              }
-            />
+          <Field label="Pay to" hint="demo accounts">
+            <Select
+              value={String(payeeAccountId ?? "")}
+              onValueChange={(v) => setPayeeAccountId(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEMO_ACCOUNTS.filter((a) => a.accountId !== payerAccountId).map((a) => (
+                  <SelectItem key={a.accountId} value={String(a.accountId)}>
+                    {a.name} · {a.bank}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
+
           <Field label="Payment type">
             <Select value={optionId} onValueChange={(v) => onOptionChange(v as PaymentOptionId)}>
               <SelectTrigger>
@@ -488,10 +505,10 @@ export function CreatePaymentDialog({
                   (total charged). The QR updates as the amount changes.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  On “Create payment” the backend records it as pending, this screen shows the QR
-                  and polls <span className="font-mono">GET /api/payments/{"{id}"}</span> every 2s
-                  until the status changes.
+                  On “Create payment” the collection is recorded as pending, the QR is shown with a
+                  spinner, and the payment settles to COMPLETED after ~5 seconds.
                 </p>
+
 
               </div>
               <div className="justify-self-center rounded-md bg-white p-3">
