@@ -86,7 +86,11 @@ export function CreatePaymentDialog({
   const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
-    setPayerAccountId(getAuthUser()?.userId ?? null);
+    const me = getAuthUser()?.userId ?? DEMO_ACCOUNTS[0]!.accountId;
+    setPayerAccountId(me);
+    setPayeeAccountId((p) =>
+      p === null || p === me ? (DEMO_ACCOUNTS.find((a) => a.accountId !== me)?.accountId ?? null) : p,
+    );
     if (open) setAwaitingPayment(null);
   }, [open]);
 
@@ -96,8 +100,9 @@ export function CreatePaymentDialog({
     enabled: !!awaitingPayment,
     refetchInterval: (q) => {
       const s = q.state.data?.status;
-      return s === "COMPLETED" || s === "FAILED" ? false : 2000;
+      return s === "COMPLETED" || s === "FAILED" ? false : 1000;
     },
+
   });
 
   const liveStatus = poll.data?.status ?? awaitingPayment?.status ?? null;
