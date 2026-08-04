@@ -292,46 +292,65 @@ export const api = {
 
   // POST /api/auth/login
   login: (email: string, password: string) =>
-    request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
-      "/api/auth/login",
-      { method: "POST", body: JSON.stringify({ email, password }) },
-    ),
+    isDemoMode()
+      ? mockApi.login(email)
+      : request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
+          "/api/auth/login",
+          { method: "POST", body: JSON.stringify({ email, password }) },
+        ),
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
-    request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
-      "/api/auth/register",
-      { method: "POST", body: JSON.stringify(data) },
-    ),
+    isDemoMode()
+      ? mockApi.login(data.email)
+      : request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
+          "/api/auth/register",
+          { method: "POST", body: JSON.stringify(data) },
+        ),
   // GET /api/payments
-  listPayments: () => request<Payment[]>("/api/payments"),
+  listPayments: () =>
+    isDemoMode() ? mockApi.listPayments() : request<Payment[]>("/api/payments"),
   // GET /api/payments/status/{status}
   listPaymentsByStatus: (status: PaymentStatus) =>
-    request<Payment[]>(`/api/payments/status/${status}`),
+    isDemoMode()
+      ? mockApi.listPaymentsByStatus(status)
+      : request<Payment[]>(`/api/payments/status/${status}`),
   // GET /api/payments/{id}
-  getPayment: (id: number | string) => request<Payment>(`/api/payments/${id}`),
+  getPayment: (id: number | string) =>
+    isDemoMode() ? mockApi.getPayment(id) : request<Payment>(`/api/payments/${id}`),
   // GET /api/payments/{id}/history
   getPaymentHistory: (id: number | string) =>
-    request<PaymentHistoryEntry[]>(`/api/payments/${id}/history`),
+    isDemoMode()
+      ? mockApi.getPaymentHistory(id)
+      : request<PaymentHistoryEntry[]>(`/api/payments/${id}/history`),
   // POST /api/payments
   createPayment: (data: CreatePaymentRequest) =>
-    request<Payment>("/api/payments", { method: "POST", body: JSON.stringify(data) }),
+    isDemoMode()
+      ? mockApi.createPayment(data)
+      : request<Payment>("/api/payments", { method: "POST", body: JSON.stringify(data) }),
   // PUT /api/payments/{id}/status
   updatePaymentStatus: (
     id: number | string,
     data: { status: PaymentStatus; reasonCode?: string | undefined; reasonMessage?: string | undefined },
   ) =>
-    request<Payment>(`/api/payments/${id}/status`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+    isDemoMode()
+      ? mockApi.updatePaymentStatus(id, data)
+      : request<Payment>(`/api/payments/${id}/status`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
   // GET /api/crowdfunding/campaigns/{id}
-  getCampaign: (id: number | string) => request<Campaign>(`/api/crowdfunding/campaigns/${id}`),
+  getCampaign: (id: number | string) =>
+    isDemoMode() ? mockApi.getCampaign(id) : request<Campaign>(`/api/crowdfunding/campaigns/${id}`),
   // GET /api/crowdfunding/campaigns/{id}/progress
   getCampaignProgress: (id: number | string) =>
-    request<CampaignProgress>(`/api/crowdfunding/campaigns/${id}/progress`),
+    isDemoMode()
+      ? mockApi.getCampaignProgress(id)
+      : request<CampaignProgress>(`/api/crowdfunding/campaigns/${id}/progress`),
   // GET /api/crowdfunding/campaigns/{id}/contributions
   getContributions: (id: number | string) =>
-    request<Contribution[]>(`/api/crowdfunding/campaigns/${id}/contributions`),
+    isDemoMode()
+      ? mockApi.getContributions(id)
+      : request<Contribution[]>(`/api/crowdfunding/campaigns/${id}/contributions`),
   // POST /api/crowdfunding/campaigns/{id}/contributions
   contribute: (
     id: number | string,
@@ -343,11 +362,14 @@ export const api = {
       anonymous?: boolean;
     },
   ) =>
-    request<Contribution>(`/api/crowdfunding/campaigns/${id}/contributions`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    isDemoMode()
+      ? mockApi.contribute(id, data)
+      : request<Contribution>(`/api/crowdfunding/campaigns/${id}/contributions`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
 };
+
 
 export function formatAmount(value: string | number | null | undefined, currency?: string | null) {
   if (value === null || value === undefined || value === "") return "—";
