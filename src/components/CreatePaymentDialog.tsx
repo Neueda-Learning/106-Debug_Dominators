@@ -197,8 +197,12 @@ export function CreatePaymentDialog({
       return api.createPayment(payload);
     },
     onSuccess: (payment) => {
-      toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       queryClient.invalidateQueries({ queryKey: ["payments"] });
+      if (upiMode) {
+        setAwaitingPayment(payment);
+        return;
+      }
+      toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       onOpenChange(false);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create payment"),
@@ -213,7 +217,8 @@ export function CreatePaymentDialog({
     (payeeAccountId !== null && payeeAccountId < 0) ||
     (cardMode && !cardValid) ||
     (needsBankDetails && !bankValid) ||
-    (upiMode && !upiUtr) ||
+    (upiMode && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(upiId.trim())) ||
+
     (cryptoMode && walletAddress.trim().length < 8);
 
   return (
