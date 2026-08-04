@@ -62,9 +62,10 @@ export function CreatePaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [payerAccountId, setPayerAccountId] = useState<number | null>(null);
+  const [payerAccountId, setPayerAccountId] = useState<number | null>(DEMO_ACCOUNTS[0]!.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
   const [payeeAccountId, setPayeeAccountId] = useState<number | null>(2);
+
   const [amount, setAmount] = useState(100);
   const [sourceCurrencyCode, setSourceCurrencyCode] = useState("USD");
   const [settlementCurrencyCode, setSettlementCurrencyCode] = useState("USD");
