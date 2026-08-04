@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,7 +38,9 @@ import {
   round2,
   type PaymentOptionId,
   type CreatePaymentRequest,
+  type Payment,
 } from "@/lib/api";
+
 
 function randomRef(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
@@ -75,16 +79,34 @@ export function CreatePaymentDialog({
   const [walletAddress, setWalletAddress] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [ifscCode, setIfscCode] = useState("");
-  const [upiUtr, setUpiUtr] = useState<string | null>(null);
+  // UPI: after creating the payment we wait for the backend to confirm collection.
+  const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
     setPayerAccountId(getAuthUser()?.userId ?? null);
+    if (open) setAwaitingPayment(null);
   }, [open]);
 
-  // Any change to the charged amount, payee VPA or method invalidates a simulated UPI receipt.
+  const poll = useQuery({
+    queryKey: ["payments", awaitingPayment?.paymentId, "poll"],
+    queryFn: () => api.getPayment(awaitingPayment!.paymentId),
+    enabled: !!awaitingPayment,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "COMPLETED" || s === "FAILED" ? false : 2000;
+    },
+  });
+
+  const liveStatus = poll.data?.status ?? awaitingPayment?.status ?? null;
+  const settled = liveStatus === "COMPLETED" || liveStatus === "FAILED";
+
   useEffect(() => {
-    setUpiUtr(null);
-  }, [amount, upiId, optionId, sourceCurrencyCode]);
+    if (!awaitingPayment || !settled) return;
+    queryClient.invalidateQueries({ queryKey: ["payments"] });
+    if (liveStatus === "COMPLETED") toast.success("UPI collection confirmed");
+    else toast.error("UPI collection failed");
+  }, [settled, liveStatus, awaitingPayment, queryClient]);
+
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
   const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
@@ -146,8 +168,8 @@ export function CreatePaymentDialog({
   const methodDetail = () => {
     if (bankMode_) return `Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode)
-      return `UPI: ${upiId.trim() || "merchant@ledger"} · UTR ${upiUtr ?? "PENDING"}`;
+    if (upiMode) return `UPI: ${upiId.trim() || "merchant@ledger"}`;
+
     if (cryptoMode)
       return cryptoNeedsBank
         ? `Wallet: ${walletAddress.trim()} · payout ${settlementTotal} ${settlementCurrencyCode} to ${bankDetail()}`
@@ -175,8 +197,12 @@ export function CreatePaymentDialog({
       return api.createPayment(payload);
     },
     onSuccess: (payment) => {
-      toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       queryClient.invalidateQueries({ queryKey: ["payments"] });
+      if (upiMode) {
+        setAwaitingPayment(payment);
+        return;
+      }
+      toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       onOpenChange(false);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to create payment"),
@@ -191,10 +217,69 @@ export function CreatePaymentDialog({
     (payeeAccountId !== null && payeeAccountId < 0) ||
     (cardMode && !cardValid) ||
     (needsBankDetails && !bankValid) ||
-    (upiMode && !upiUtr) ||
+    (upiMode && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(upiId.trim())) ||
     (cryptoMode && walletAddress.trim().length < 8);
 
+  if (awaitingPayment) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {liveStatus === "COMPLETED"
+                ? "Payment received"
+                : liveStatus === "FAILED"
+                  ? "Payment failed"
+                  : "Waiting for payment confirmation…"}
+            </DialogTitle>
+            <DialogDescription>
+              {awaitingPayment.paymentRef} · {total} {sourceCurrencyCode} to{" "}
+              {upiId.trim() || "merchant@ledger"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center gap-4 py-2">
+            {settled ? (
+              liveStatus === "COMPLETED" ? (
+                <CheckCircle2 className="size-14 text-emerald-400" />
+              ) : (
+                <XCircle className="size-14 text-destructive" />
+              )
+            ) : (
+              <>
+                <div className="rounded-md bg-white p-3">
+                  <QRCodeSVG value={upiPayload} size={148} level="M" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Waiting for payment confirmation…
+                </div>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Status <span className="font-mono text-foreground">{liveStatus}</span> · polling every
+              2s
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant={settled ? "default" : "ghost"}
+              onClick={() => {
+                setAwaitingPayment(null);
+                onOpenChange(false);
+              }}
+            >
+              {settled ? "Done" : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
+
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
@@ -402,26 +487,12 @@ export function CreatePaymentDialog({
                   </span>{" "}
                   (total charged). The QR updates as the amount changes.
                 </p>
-                {upiUtr ? (
-                  <p className="text-xs text-emerald-400">
-                    Collection confirmed — UTR{" "}
-                    <span className="font-mono">{upiUtr}</span>. Create the payment to record it.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Simulation: a real UPI app would call our webhook. Here, confirm the collection
-                    manually to mint a mock UTR.
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  variant={upiUtr ? "secondary" : "default"}
-                  size="sm"
-                  onClick={() => setUpiUtr(randomRef("UTR"))}
-                  disabled={!!upiUtr || total <= 0}
-                >
-                  {upiUtr ? "Payment confirmed" : "I've paid — confirm collection"}
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  On “Create payment” the backend records it as pending, this screen shows the QR
+                  and polls <span className="font-mono">GET /api/payments/{"{id}"}</span> every 2s
+                  until the status changes.
+                </p>
+
               </div>
               <div className="justify-self-center rounded-md bg-white p-3">
                 <QRCodeSVG value={upiPayload} size={132} level="M" />
