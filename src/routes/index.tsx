@@ -99,7 +99,6 @@ function PaymentsPage() {
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mono-tag">GET /api/payments</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">
               Payments
             </h1>

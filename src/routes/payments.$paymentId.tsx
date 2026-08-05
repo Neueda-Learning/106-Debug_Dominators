@@ -107,7 +107,6 @@ function PaymentDetailPage() {
             <div className="panel p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="mono-tag">GET /api/payments/{p.paymentId}</p>
                   <h1 className="mt-2 font-mono text-2xl font-semibold tracking-tight">
                     {p.paymentRef}
                   </h1>
@@ -144,7 +143,6 @@ function PaymentDetailPage() {
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
               <div className="panel p-6">
-                <p className="mono-tag">GET /api/payments/{p.paymentId}/history</p>
                 <h2 className="mt-1.5 text-lg font-semibold">Status history</h2>
 
                 {history.isLoading ? (
@@ -192,7 +190,6 @@ function PaymentDetailPage() {
               </div>
 
               <div className="panel h-fit p-6">
-                <p className="mono-tag">POST /api/payments/{p.paymentId}/refunds</p>
                 <h2 className="mt-1.5 text-lg font-semibold">Refund</h2>
 
                 {(refunds.data ?? []).length > 0 ? (
