@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { ShieldCheck } from "lucide-react";
 
 export function AppHeader() {
   return (
@@ -7,7 +6,7 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-6 py-4">
         <Link to="/" className="flex items-center gap-2.5">
           <span className="grid size-8 place-items-center rounded-md bg-primary/15 text-primary">
-            <ShieldCheck className="size-4" />
+            <img src="/favicon.ico" alt="FasterPay logo" className="size-5" />
           </span>
           <span className="text-sm font-semibold tracking-tight">FasterPay</span>
         </Link>
