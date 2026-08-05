@@ -30,24 +30,24 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
-import { accountName, mockApi } from "@/lib/mock";
+import { CURRENT_USER, accountName, mockApi } from "@/lib/mock";
 
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Payments Console — Create & Track Payment Lifecycles" },
+      { title: "FasterPay — Send Money & Track Every Payment" },
       {
         name: "description",
         content:
-          "Create payments, filter by status, and audit every CREATED to COMPLETED transition against the Spring Boot payments API.",
+          "Pay people and merchants with FasterPay: UPI, cards, bank transfers and crypto, with full status history and refunds on failed payments.",
       },
-      { property: "og:title", content: "Payments Console — Create & Track Payments" },
+      { property: "og:title", content: "FasterPay — Send Money & Track Every Payment" },
       {
         property: "og:description",
         content:
-          "Create payments, filter by status, and audit every lifecycle transition in one console.",
+          "Pay people and merchants, track status history, and request refunds on failed payments.",
       },
     ],
   }),
@@ -101,9 +101,12 @@ function PaymentsPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mono-tag">GET /api/payments</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Payments</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+              {CURRENT_USER.name}'s payments
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              CREATED → VALIDATED → SENT → COMPLETED, with FAILED possible at any stage.
+              CREATED → VALIDATED → PROCESSING → COMPLETED, with FAILED possible at any stage.
+              Failed payments can be refunded.
             </p>
           </div>
           <div className="flex gap-2">
@@ -128,7 +131,7 @@ function PaymentsPage() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
           <StatCard label="Total" value={counts["TOTAL"] ?? 0} />
           {PAYMENT_STATUSES.map((s) => (
             <StatCard key={s} label={s} value={counts[s] ?? 0} status={s} />
