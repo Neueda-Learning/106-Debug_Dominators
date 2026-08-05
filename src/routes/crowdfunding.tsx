@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,9 @@ export const Route = createFileRoute("/crowdfunding")({
 });
 
 const PRESETS = ["100", "250", "500", "custom"];
-const CAMPAIGN_IDS = ["1", "2", "3"];
 
 function CrowdfundingPage() {
-  const [campaignId, setCampaignId] = useState("1");
+  const [campaignId, setCampaignId] = useState("");
   const [preset, setPreset] = useState("100");
   const [customAmount, setCustomAmount] = useState("");
   const [contributorId, setContributorId] = useState("1");
@@ -45,32 +44,47 @@ function CrowdfundingPage() {
   const [anonymous, setAnonymous] = useState(false);
   const queryClient = useQueryClient();
 
+  const campaigns = useQuery({
+    queryKey: ["campaigns"],
+    queryFn: () => api.listCampaigns(),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (campaignId || !campaigns.data?.length) return;
+    setCampaignId(String(campaigns.data[0].id));
+  }, [campaignId, campaigns.data]);
+
   const campaign = useQuery({
     queryKey: ["campaign", campaignId],
     queryFn: () => api.getCampaign(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
   const progress = useQuery({
     queryKey: ["campaign-progress", campaignId],
     queryFn: () => api.getCampaignProgress(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
   const contributions = useQuery({
     queryKey: ["campaign-contributions", campaignId],
     queryFn: () => api.getContributions(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
 
   const amount = preset === "custom" ? Number(customAmount) : Number(preset);
   const remaining = progress.data ? Number(progress.data.remainingAmount) : null;
   const pct = progress.data ? Math.min(100, Number(progress.data.progressPercentage) || 0) : 0;
-  const campaignIndex = CAMPAIGN_IDS.indexOf(campaignId);
+  const campaignIds = (campaigns.data ?? []).map((item) => String(item.id));
+  const campaignIndex = campaignIds.indexOf(campaignId);
 
   const goToCampaign = (index: number) => {
-    if (index < 0 || index >= CAMPAIGN_IDS.length) {
+    if (index < 0 || index >= campaignIds.length) {
       return;
     }
-    setCampaignId(CAMPAIGN_IDS[index]);
+    setCampaignId(campaignIds[index]);
   };
 
   const contribute = useMutation({
@@ -108,11 +122,17 @@ function CrowdfundingPage() {
           </div>
         </div>
 
-        {campaign.isError || progress.isError ? (
+        {campaigns.isSuccess && campaigns.data.length === 0 ? (
+          <div className="panel mt-8 p-6 text-sm text-muted-foreground">
+            No campaigns were found in the database.
+          </div>
+        ) : null}
+
+        {campaigns.isError || campaign.isError || progress.isError ? (
           <div className="panel mt-8 flex items-start gap-3 p-6 text-sm">
             <AlertTriangle className="mt-0.5 size-4 text-status-failed" />
             <p className="text-muted-foreground">
-              {((campaign.error ?? progress.error) as Error)?.message}
+              {((campaigns.error ?? campaign.error ?? progress.error) as Error)?.message}
             </p>
           </div>
         ) : null}
@@ -197,7 +217,7 @@ function CrowdfundingPage() {
                 >
                   &lt;
                 </Button>
-                {CAMPAIGN_IDS.map((id) => (
+                {campaignIds.map((id) => (
                   <Button
                     key={id}
                     variant={campaignId === id ? "default" : "outline"}
@@ -211,7 +231,7 @@ function CrowdfundingPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => goToCampaign(campaignIndex + 1)}
-                  disabled={campaignIndex === -1 || campaignIndex >= CAMPAIGN_IDS.length - 1}
+                  disabled={campaignIndex === -1 || campaignIndex >= campaignIds.length - 1}
                 >
                   &gt;
                 </Button>

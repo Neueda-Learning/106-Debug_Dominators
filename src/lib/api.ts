@@ -7,6 +7,7 @@ import { mockApi } from "./mock";
 
 // Mirrors payment_db.sql: payment.status and payment.payment_method enums.
 export const PAYMENT_STATUSES = [
+  "PENDING",
   "CREATED",
   "VALIDATED",
   "PROCESSING",
@@ -60,6 +61,8 @@ export const FIAT_CURRENCIES = [
   "CHF",
 ] as const;
 export const CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT", "USDC", "SOL", "XRP"] as const;
+export const LIVE_FIAT_CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD"] as const;
+export const LIVE_CRYPTO_CURRENCIES = ["BTC", "ETH", "USDT"] as const;
 export const CURRENCIES = [...FIAT_CURRENCIES, ...CRYPTO_CURRENCIES] as const;
 
 /** UI-level payment options: each maps to a backend paymentType + paymentMethod pair. */
@@ -144,6 +147,7 @@ export const isCryptoCurrency = (code: string) =>
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export type ApiPaymentMethod = PaymentMethod | "BANK_TRANSFER";
 export type PaymentType = (typeof PAYMENT_TYPES)[number];
 
 export type Payment = {
@@ -165,6 +169,10 @@ export type Payment = {
   settlementCurrencyCode: string | null;
   exchangeRateId: number | null;
   description: string | null;
+  sourceAccount?: string | null;
+  destinationAccount?: string | null;
+  sourceCountry?: string | null;
+  destinationCountry?: string | null;
   initiatedAt: string | null;
   completedAt: string | null;
   failedAt: string | null;
@@ -208,7 +216,7 @@ export type CreatePaymentRequest = {
   payeeAccountId?: number | null;
   campaignId?: number | null;
   paymentType: PaymentType;
-  paymentMethod: PaymentMethod;
+  paymentMethod: ApiPaymentMethod;
   amount: number;
   feeAmount?: number | null;
   taxAmount?: number | null;
@@ -216,6 +224,10 @@ export type CreatePaymentRequest = {
   settlementCurrencyCode?: string | null;
   exchangeRateId?: number | null;
   description?: string | null;
+  sourceAccount?: string | null;
+  destinationAccount?: string | null;
+  sourceCountry?: string | null;
+  destinationCountry?: string | null;
 };
 
 export type Campaign = {
@@ -253,9 +265,86 @@ export type Contribution = {
   contributedAt: string | null;
 };
 
+type SpringPaymentResponse = {
+  id: number;
+  paymentId: string;
+  referenceNumber: string;
+  sourceAccount: string;
+  destinationAccount: string;
+  amount: string | number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  status: PaymentStatus;
+  sourceCountry: string | null;
+  destinationCountry: string | null;
+  description: string | null;
+  createdAt: string | null;
+};
+
+type SpringPaymentRequest = {
+  sourceAccount: string;
+  destinationAccount: string;
+  amount: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  sourceCountry: string;
+  destinationCountry: string;
+  description?: string | null;
+};
+
+type SpringPaymentHistoryResponse = {
+  historyId: number;
+  paymentId: number;
+  oldStatus: PaymentStatus | null;
+  newStatus: PaymentStatus;
+  eventType: string | null;
+  remarks: string | null;
+  changedBy: string | null;
+  changedAt: string;
+};
+
+type SpringRefundResponse = {
+  refundId: number;
+  paymentId: number;
+  refundReference: string;
+  refundAmount: string | number;
+  refundMethod: RefundMethod;
+  refundStatus: RefundStatus;
+  refundReason: string;
+  initiatedBy: "CUSTOMER" | "ADMIN" | "SYSTEM";
+  refundDate: string;
+};
+
+type SpringCampaignResponse = {
+  campaignId: number;
+  campaignCode: string;
+  campaignTitle: string;
+  organizerName: string;
+  goalAmount: string | number;
+  collectedAmount: string | number;
+  endDate: string | null;
+  campaignStatus: string;
+  description: string | null;
+  createdBy: string | null;
+};
+
+type SpringContributionResponse = {
+  contributionId: number;
+  campaignId: number;
+  paymentId: number | null;
+  contributorName: string | null;
+  contributorEmail: string | null;
+  contributionAmount: string | number;
+  contributionStatus: string;
+  anonymousDonation: boolean | null;
+  message: string | null;
+  receiptNumber: string | null;
+  contributionDate: string | null;
+};
+
 const BASE_KEY = "pp.apiBaseUrl";
 const TOKEN_KEY = "pp.jwt";
-export const DEFAULT_BASE_URL = "http://localhost:8080";
+export const DEFAULT_BASE_URL = "http://localhost:8082";
 
 export function getApiBaseUrl() {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
@@ -275,6 +364,160 @@ export function setToken(token: string | null) {
 
 const USER_KEY = "pp.user";
 export type AuthUser = { userId: number; email: string; role: string };
+
+function derivePaymentType(paymentMethod: PaymentMethod): PaymentType {
+  return paymentMethod === "CRYPTO" ? "CRYPTO" : "NORMAL";
+}
+
+function mapSpringPayment(payment: SpringPaymentResponse): Payment {
+  return {
+    paymentId: payment.id,
+    paymentRef: payment.paymentId || payment.referenceNumber,
+    externalPaymentRef: payment.referenceNumber || null,
+    idempotencyKey: "",
+    payerAccountId: 0,
+    payeeAccountId: null,
+    campaignId: null,
+    paymentType: derivePaymentType(payment.paymentMethod),
+    paymentMethod: payment.paymentMethod,
+    status: payment.status,
+    amount: payment.amount,
+    feeAmount: null,
+    taxAmount: null,
+    netAmount: payment.amount,
+    sourceCurrencyCode: payment.currency,
+    settlementCurrencyCode: payment.currency,
+    exchangeRateId: null,
+    description: payment.description,
+    sourceAccount: payment.sourceAccount,
+    destinationAccount: payment.destinationAccount,
+    sourceCountry: payment.sourceCountry,
+    destinationCountry: payment.destinationCountry,
+    initiatedAt: payment.createdAt,
+    completedAt: payment.status === "COMPLETED" ? payment.createdAt : null,
+    failedAt: payment.status === "FAILED" ? payment.createdAt : null,
+    createdAt: payment.createdAt,
+    updatedAt: payment.createdAt,
+  };
+}
+
+function mapSpringPaymentHistory(entry: SpringPaymentHistoryResponse): PaymentHistoryEntry {
+  return {
+    paymentStatusHistoryId: entry.historyId,
+    paymentId: entry.paymentId,
+    oldStatus: entry.oldStatus,
+    newStatus: entry.newStatus,
+    changedByUserId: null,
+    changeReasonCode: entry.eventType,
+    changeReasonMessage: entry.remarks,
+    metadata: entry.changedBy,
+    changedAt: entry.changedAt,
+  };
+}
+
+function mapSpringRefund(refund: SpringRefundResponse): Refund {
+  return {
+    refundId: refund.refundId,
+    paymentId: refund.paymentId,
+    refundReference: refund.refundReference,
+    refundAmount: refund.refundAmount,
+    refundReason: refund.refundReason,
+    refundStatus: refund.refundStatus,
+    refundMethod: refund.refundMethod,
+    initiatedBy: refund.initiatedBy,
+    refundDate: refund.refundDate,
+    remarks: null,
+  };
+}
+
+function mapSpringCampaign(campaign: SpringCampaignResponse): Campaign {
+  return {
+    id: campaign.campaignId,
+    creator: 0,
+    title: campaign.campaignTitle,
+    description: campaign.description,
+    targetAmount: campaign.goalAmount,
+    currentAmount: campaign.collectedAmount,
+    currency: "USD",
+    deadline: campaign.endDate,
+    status: campaign.campaignStatus,
+  };
+}
+
+function mapSpringContribution(contribution: SpringContributionResponse): Contribution {
+  const contributorIdMatch = contribution.contributorName?.match(/(\d+)/);
+  return {
+    id: contribution.contributionId,
+    campaignId: contribution.campaignId,
+    contributorId: contributorIdMatch ? Number(contributorIdMatch[1]) : null,
+    paymentId: contribution.paymentId,
+    amount: contribution.contributionAmount,
+    currency: "USD",
+    status: contribution.contributionStatus,
+    note: contribution.message,
+    anonymous: contribution.anonymousDonation,
+    contributedAt: contribution.contributionDate,
+  };
+}
+
+function normalizePaymentMethod(method: ApiPaymentMethod): PaymentMethod {
+  return method === "BANK_TRANSFER" ? "NET_BANKING" : method;
+}
+
+function mapCreatePaymentRequest(data: CreatePaymentRequest): SpringPaymentRequest {
+  return {
+    sourceAccount: data.sourceAccount?.trim() || String(data.payerAccountId),
+    destinationAccount: data.destinationAccount?.trim() || String(data.payeeAccountId ?? ""),
+    amount: data.amount,
+    currency: data.sourceCurrencyCode,
+    paymentMethod: normalizePaymentMethod(data.paymentMethod),
+    sourceCountry: data.sourceCountry?.trim() || "US",
+    destinationCountry: data.destinationCountry?.trim() || "US",
+    description: data.description ?? null,
+  };
+}
+
+async function createLiveContributionPayment(
+  campaignId: number | string,
+  amount: number,
+  contributorId?: number | null,
+) {
+  const campaign = await api.getCampaign(campaignId);
+  const payment = await api.createPayment({
+    paymentRef: `CAMP-${campaignId}-${Date.now()}`,
+    idempotencyKey: `CAMP-IDEM-${campaignId}-${Date.now()}`,
+    payerAccountId: contributorId ?? 0,
+    payeeAccountId: null,
+    paymentType: "NORMAL",
+    paymentMethod: "UPI",
+    amount,
+    sourceCurrencyCode: campaign.currency,
+    settlementCurrencyCode: campaign.currency,
+    sourceAccount: contributorId ? `Contributor-${contributorId}` : "Contributor-guest",
+    destinationAccount: campaign.title,
+    sourceCountry: "IN",
+    destinationCountry: "IN",
+    description: `Crowdfunding contribution for ${campaign.title}`,
+  });
+
+  return payment.paymentId;
+}
+
+function calculateCampaignProgress(campaign: Campaign): CampaignProgress {
+  const target = Number(campaign.targetAmount) || 0;
+  const current = Number(campaign.currentAmount) || 0;
+  const remaining = Math.max(0, target - current);
+  const progress = target > 0 ? round2((current / target) * 100) : 0;
+  return {
+    id: campaign.id,
+    targetAmount: campaign.targetAmount,
+    currentAmount: campaign.currentAmount,
+    remainingAmount: remaining,
+    progressPercentage: progress,
+    status: campaign.status,
+    deadline: campaign.deadline,
+  };
+}
 
 export function setAuthUser(user: AuthUser | null) {
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -326,8 +569,8 @@ function safeJson(text: string) {
 const DEMO_KEY = "pp.demoMode";
 /** Demo mode serves data from the in-browser demo store (no backend required). */
 export function isDemoMode() {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(DEMO_KEY) !== "off";
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(DEMO_KEY) === "on";
 }
 export function setDemoMode(on: boolean) {
   localStorage.setItem(DEMO_KEY, on ? "on" : "off");
@@ -339,39 +582,46 @@ export const api = {
   login: (email: string, password: string) =>
     isDemoMode()
       ? mockApi.login(email)
-      : request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
-          "/api/auth/login",
-          { method: "POST", body: JSON.stringify({ email, password }) },
+      : Promise.reject(
+          new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
         ),
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
     isDemoMode()
       ? mockApi.login(data.email)
-      : request<{ token: string; tokenType: string; userId: number; email: string; role: string }>(
-          "/api/auth/register",
-          { method: "POST", body: JSON.stringify(data) },
+      : Promise.reject(
+          new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
         ),
   // GET /api/payments
   listPayments: () =>
-    isDemoMode() ? mockApi.listPayments() : request<Payment[]>("/api/payments"),
+    isDemoMode()
+      ? mockApi.listPayments()
+      : request<SpringPaymentResponse[]>("/payments").then((rows) => rows.map(mapSpringPayment)),
   // GET /api/payments/status/{status}
   listPaymentsByStatus: (status: PaymentStatus) =>
     isDemoMode()
       ? mockApi.listPaymentsByStatus(status)
-      : request<Payment[]>(`/api/payments/status/${status}`),
+      : api.listPayments().then((rows) => rows.filter((payment) => payment.status === status)),
   // GET /api/payments/{id}
   getPayment: (id: number | string) =>
-    isDemoMode() ? mockApi.getPayment(id) : request<Payment>(`/api/payments/${id}`),
+    isDemoMode()
+      ? mockApi.getPayment(id)
+      : request<SpringPaymentResponse>(`/payments/${id}`).then(mapSpringPayment),
   // GET /api/payments/{id}/history
   getPaymentHistory: (id: number | string) =>
     isDemoMode()
       ? mockApi.getPaymentHistory(id)
-      : request<PaymentHistoryEntry[]>(`/api/payments/${id}/history`),
+      : request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${id}`).then((rows) =>
+          rows.map(mapSpringPaymentHistory),
+        ),
   // POST /api/payments
   createPayment: (data: CreatePaymentRequest) =>
     isDemoMode()
       ? mockApi.createPayment(data)
-      : request<Payment>("/api/payments", { method: "POST", body: JSON.stringify(data) }),
+      : request<SpringPaymentResponse>("/payments", {
+          method: "POST",
+          body: JSON.stringify(mapCreatePaymentRequest(data)),
+        }).then(mapSpringPayment),
   // PUT /api/payments/{id}/status
   updatePaymentStatus: (
     id: number | string,
@@ -379,13 +629,16 @@ export const api = {
   ) =>
     isDemoMode()
       ? mockApi.updatePaymentStatus(id, data)
-      : request<Payment>(`/api/payments/${id}/status`, {
-          method: "PUT",
-          body: JSON.stringify(data),
-        }),
+      : Promise.reject(new Error("Payment status updates are not exposed by this backend.")),
   // GET /api/payments/{id}/refunds
   listRefunds: (id: number | string) =>
-    isDemoMode() ? mockApi.listRefunds(id) : request<Refund[]>(`/api/payments/${id}/refunds`),
+    isDemoMode()
+      ? mockApi.listRefunds(id)
+      : request<SpringRefundResponse[]>("/refunds").then((rows) =>
+          rows
+            .filter((refund) => String(refund.paymentId) === String(id))
+            .map(mapSpringRefund),
+        ),
   // POST /api/payments/{id}/refunds
   requestRefund: (
     id: number | string,
@@ -393,23 +646,39 @@ export const api = {
   ) =>
     isDemoMode()
       ? mockApi.requestRefund(id, data)
-      : request<Refund>(`/api/payments/${id}/refunds`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
+      : api.getPayment(id).then((payment) =>
+          request<SpringRefundResponse>("/refunds", {
+            method: "POST",
+            body: JSON.stringify({
+              paymentId: Number(id),
+              refundAmount: Number(payment.netAmount ?? payment.amount),
+              refundMethod: data.refundMethod,
+              refundReason: data.refundReason,
+              initiatedBy: "CUSTOMER",
+            }),
+          }).then(mapSpringRefund),
+        ),
+  listCampaigns: () =>
+    isDemoMode()
+      ? mockApi.listCampaigns()
+      : request<SpringCampaignResponse[]>("/campaigns").then((rows) => rows.map(mapSpringCampaign)),
   // GET /api/crowdfunding/campaigns/{id}
   getCampaign: (id: number | string) =>
-    isDemoMode() ? mockApi.getCampaign(id) : request<Campaign>(`/api/crowdfunding/campaigns/${id}`),
+    isDemoMode()
+      ? mockApi.getCampaign(id)
+      : request<SpringCampaignResponse>(`/campaigns/${id}`).then(mapSpringCampaign),
   // GET /api/crowdfunding/campaigns/{id}/progress
   getCampaignProgress: (id: number | string) =>
     isDemoMode()
       ? mockApi.getCampaignProgress(id)
-      : request<CampaignProgress>(`/api/crowdfunding/campaigns/${id}/progress`),
+      : api.getCampaign(id).then(calculateCampaignProgress),
   // GET /api/crowdfunding/campaigns/{id}/contributions
   getContributions: (id: number | string) =>
     isDemoMode()
       ? mockApi.getContributions(id)
-      : request<Contribution[]>(`/api/crowdfunding/campaigns/${id}/contributions`),
+      : request<SpringContributionResponse[]>(`/contributions/campaign/${id}`).then((rows) =>
+          rows.map(mapSpringContribution),
+        ),
   // POST /api/crowdfunding/campaigns/{id}/contributions
   contribute: (
     id: number | string,
@@ -423,10 +692,24 @@ export const api = {
   ) =>
     isDemoMode()
       ? mockApi.contribute(id, data)
-      : request<Contribution>(`/api/crowdfunding/campaigns/${id}/contributions`, {
-          method: "POST",
-          body: JSON.stringify(data),
-        }),
+      : createLiveContributionPayment(id, data.amount, data.contributorId).then((paymentId) =>
+          request<SpringContributionResponse>("/contributions", {
+            method: "POST",
+            body: JSON.stringify({
+              campaignId: Number(id),
+              paymentId,
+              contributorName: data.anonymous
+                ? "Anonymous"
+                : `Contributor #${data.contributorId ?? "guest"}`,
+              contributorEmail: data.contributorId
+                ? `contributor${data.contributorId}@fasterpay.local`
+                : "guest@fasterpay.local",
+              contributionAmount: data.amount,
+              anonymousDonation: data.anonymous ?? false,
+              message: data.note ?? null,
+            }),
+          }).then(mapSpringContribution),
+        ),
 };
 
 
