@@ -44,7 +44,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [CURRENT_USER, ...DEMO_PAYEES];
 export const accountName = (id: number | null | undefined) =>
   DEMO_ACCOUNTS.find((a) => a.accountId === id)?.name ?? (id ? `Account #${id}` : "\u2014");
 
-const STORE_KEY = "pp.demoStore.v2";
+const STORE_KEY = "pp.demoStore.v3";
 const UPI_SETTLE_MS = 5000;
 
 type Store = {
@@ -213,7 +213,7 @@ function seed(): Store {
     contributions,
     refunds,
     nextRefundId: 7002,
-    nextPaymentId: 1005,
+    nextPaymentId: 1007,
     nextHistoryId: hid,
     nextContributionId: 9003,
     upiSettleAt: {},
