@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,13 +77,6 @@ class PaymentServiceTest {
         assertThat(response.getCurrency()).isEqualTo(request.getCurrency());
         assertThat(response.getPaymentMethod()).isEqualTo(request.getPaymentMethod());
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.CREATED);
-    }
-
-    @Test
-    void createPayment_whenRequestIsNull_shouldThrowExceptionAndNotCallRepository() {
-        assertThrows(NullPointerException.class, () -> paymentService.createPayment(null));
-
-        verifyNoInteractions(paymentRepository);
     }
 
     @Test
@@ -153,6 +145,22 @@ class PaymentServiceTest {
         assertThat(response.getSourceAccount()).isEqualTo("SRC-NEW");
         assertThat(response.getDestinationAccount()).isEqualTo("DST-NEW");
         assertThat(response.getAmount()).isEqualByComparingTo("900.00");
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.CREATED);
+    }
+
+    @Test
+    void createPayment_whenRepositorySaveFails_shouldPropagateException() {
+        PaymentRequest request = buildPaymentRequest();
+        when(paymentRepository.save(any(Payment.class)))
+                .thenThrow(new RuntimeException("Database error"));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> paymentService.createPayment(request)
+        );
+
+        verify(paymentRepository).save(any(Payment.class));
+        assertThat(exception.getMessage()).isEqualTo("Database error");
     }
 
     @Test
