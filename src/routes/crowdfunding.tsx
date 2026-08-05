@@ -17,13 +17,13 @@ import { AlertTriangle, HeartHandshake } from "lucide-react";
 export const Route = createFileRoute("/crowdfunding")({
   head: () => ({
     meta: [
-      { title: "Crowdfunding Campaigns — Contribute & Track Progress" },
+      { title: "FasterPay CrowdFunding" },
       {
         name: "description",
         content:
           "Look up a campaign, see remaining amount and funding progress, contribute with preset or custom amounts, and review contribution history.",
       },
-      { property: "og:title", content: "Crowdfunding Campaigns — Contribute & Track Progress" },
+      { property: "og:title", content: "FasterPay CrowdFunding" },
       {
         property: "og:description",
         content: "Campaign progress, remaining amount, contributions, and donation presets.",
@@ -93,7 +93,7 @@ function CrowdfundingPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mono-tag">GET /api/crowdfunding/campaigns/{"{id}"}</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Crowdfunding</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">FasterPay CrowdFunding</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Track a campaign's progress and record contributions against it.
             </p>
