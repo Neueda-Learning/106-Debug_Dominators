@@ -24,7 +24,6 @@ import {
   isRefundable,
   type RefundMethod,
 } from "@/lib/api";
-import { accountName } from "@/lib/mock";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/payments/$paymentId")({
@@ -127,9 +126,9 @@ function PaymentDetailPage() {
               <div className="mt-6 grid gap-x-8 gap-y-4 border-t border-border pt-6 sm:grid-cols-2 lg:grid-cols-3">
                 <Detail label="Payment type" value={p.paymentType} />
                 <Detail label="Payment method" value={p.paymentMethod} />
-                <Detail label="Idempotency key" value={p.idempotencyKey} mono />
-                <Detail label="Paid from" value={accountName(p.payerAccountId)} />
-                <Detail label="Paid to" value={accountName(p.payeeAccountId)} />
+                <Detail label="Idempotency key" value={p.idempotencyKey || "—"} mono />
+                <Detail label="Paid from" value={p.sourceAccount || p.sourceCountry || "—"} />
+                <Detail label="Paid to" value={p.destinationAccount || p.destinationCountry || "—"} />
                 <Detail label="Campaign" value={p.campaignId ?? "—"} />
                 <Detail label="Fee" value={formatAmount(p.feeAmount, p.sourceCurrencyCode)} />
                 <Detail label="Tax" value={formatAmount(p.taxAmount, p.sourceCurrencyCode)} />
@@ -183,6 +182,8 @@ function PaymentDetailPage() {
                         )}
                         {h.changedByUserId ? (
                           <p className="mono-tag mt-1">user #{h.changedByUserId}</p>
+                        ) : h.metadata ? (
+                          <p className="mono-tag mt-1">by {h.metadata}</p>
                         ) : null}
                       </li>
                     ))}

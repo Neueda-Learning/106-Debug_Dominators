@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { PaymentStatus } from "@/lib/api";
 
 const styles: Record<string, string> = {
+  PENDING: "bg-muted text-muted-foreground border-border",
   CREATED: "bg-status-created/15 text-status-created border-status-created/40",
   VALIDATED: "bg-status-validated/15 text-status-validated border-status-validated/40",
   PROCESSING: "bg-status-sent/15 text-status-sent border-status-sent/40",

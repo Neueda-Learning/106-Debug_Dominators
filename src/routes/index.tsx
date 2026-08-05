@@ -30,7 +30,6 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
-import { CURRENT_USER, accountName, mockApi } from "@/lib/mock";
 
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
@@ -102,7 +101,7 @@ function PaymentsPage() {
           <div>
             <p className="mono-tag">GET /api/payments</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              {CURRENT_USER.name}'s payments
+              Payments
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               CREATED → VALIDATED → PROCESSING → COMPLETED, with FAILED possible at any stage.
@@ -110,15 +109,6 @@ function PaymentsPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                mockApi.resetDemoData();
-                query.refetch();
-              }}
-            >
-              Reset demo data
-            </Button>
             <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
               <RefreshCw className={`mr-1.5 size-4 ${query.isFetching ? "animate-spin" : ""}`} />
               Refresh
@@ -186,8 +176,8 @@ function PaymentsPage() {
               <div>
                 <p className="font-medium">Could not reach the payments API</p>
                 <p className="mt-1 text-muted-foreground">
-                  {(query.error as Error).message}. Check the API base URL and sign in via
-                  “Connect API” — protected endpoints require a Bearer token.
+                  {(query.error as Error).message}. Check that the Spring Boot backend is running
+                  and reachable at the configured API base URL.
                 </p>
               </div>
             </div>
@@ -224,6 +214,9 @@ function PaymentsPage() {
 }
 
 function PaymentRow({ payment }: { payment: Payment }) {
+  const sourceLabel = payment.sourceAccount || payment.sourceCountry || "—";
+  const destinationLabel = payment.destinationAccount || payment.destinationCountry || "—";
+
   return (
     <TableRow>
       <TableCell>
@@ -231,8 +224,8 @@ function PaymentRow({ payment }: { payment: Payment }) {
         <div className="mono-tag">#{payment.paymentId}</div>
       </TableCell>
       <TableCell className="text-xs">
-        <div>{accountName(payment.payerAccountId)}</div>
-        <div className="text-muted-foreground">→ {accountName(payment.payeeAccountId)}</div>
+        <div>{sourceLabel}</div>
+        <div className="text-muted-foreground">→ {destinationLabel}</div>
       </TableCell>
       <TableCell>
 

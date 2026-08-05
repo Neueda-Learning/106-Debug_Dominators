@@ -28,19 +28,20 @@ import {
 import {
   CRYPTO_CURRENCIES,
   FIAT_CURRENCIES,
+  LIVE_CRYPTO_CURRENCIES,
+  LIVE_FIAT_CURRENCIES,
   PAYMENT_OPTIONS,
   TAX_RATES,
   api,
   convertAmount,
   feeRateFor,
-  getAuthUser,
   isCryptoCurrency,
+  isDemoMode,
   round2,
   type PaymentOptionId,
   type CreatePaymentRequest,
   type Payment,
 } from "@/lib/api";
-import { CURRENT_USER, DEMO_PAYEES, accountName } from "@/lib/mock";
 
 
 
@@ -64,9 +65,11 @@ export function CreatePaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [payerAccountId, setPayerAccountId] = useState<number | null>(CURRENT_USER.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
-  const [payeeAccountId, setPayeeAccountId] = useState<number | null>(2);
+  const [sourceAccount, setSourceAccount] = useState("");
+  const [destinationAccount, setDestinationAccount] = useState("");
+  const [sourceCountry, setSourceCountry] = useState("US");
+  const [destinationCountry, setDestinationCountry] = useState("US");
 
   const [amount, setAmount] = useState(100);
   const [sourceCurrencyCode, setSourceCurrencyCode] = useState("USD");
@@ -86,11 +89,6 @@ export function CreatePaymentDialog({
   const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
-    const me = getAuthUser()?.userId ?? CURRENT_USER.accountId;
-    setPayerAccountId(me);
-    setPayeeAccountId((p) =>
-      p === null || p === me ? (DEMO_PAYEES[0]?.accountId ?? null) : p,
-    );
     if (open) setAwaitingPayment(null);
   }, [open]);
 
@@ -117,6 +115,9 @@ export function CreatePaymentDialog({
 
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
+  const liveMode = !isDemoMode();
+  const fiatCurrencies = liveMode ? LIVE_FIAT_CURRENCIES : FIAT_CURRENCIES;
+  const cryptoCurrencies = liveMode ? LIVE_CRYPTO_CURRENCIES : CRYPTO_CURRENCIES;
   const cryptoMode = option.paymentMethod === "CRYPTO";
   const bankMode_ = option.paymentMethod === "NET_BANKING";
   const cardMode = option.paymentMethod === "CREDIT_CARD";
@@ -162,7 +163,7 @@ export function CreatePaymentDialog({
     const nextCrypto = next.paymentMethod === "CRYPTO";
     setBankMode(id === "BANK_INTERNATIONAL" ? "SWIFT" : "NEFT");
     setSourceCurrencyCode((cur) => {
-      const isCryptoCur = (CRYPTO_CURRENCIES as readonly string[]).includes(cur);
+      const isCryptoCur = (cryptoCurrencies as readonly string[]).includes(cur);
       if (nextCrypto && !isCryptoCur) return "BTC";
       if (!nextCrypto && isCryptoCur) return "USD";
       if (id === "UPI") return "INR";
@@ -174,7 +175,7 @@ export function CreatePaymentDialog({
     `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
 
   const methodDetail = () => {
-    const to = `To ${accountName(payeeAccountId)}`;
+    const to = `To ${destinationAccount.trim() || "destination account"}`;
     if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
     if (upiMode) return `${to} · UPI: ${upiId.trim() || "fasterpay@upi"}`;
@@ -193,13 +194,17 @@ export function CreatePaymentDialog({
       const payload: CreatePaymentRequest = {
         paymentRef: randomRef("PAY"),
         idempotencyKey: randomRef("IDEM"),
-        payerAccountId: payerAccountId ?? 0,
-        payeeAccountId,
+        payerAccountId: 0,
+        payeeAccountId: null,
         paymentType: option.paymentType,
         paymentMethod: option.paymentMethod,
         amount,
         sourceCurrencyCode,
         settlementCurrencyCode,
+        sourceAccount,
+        destinationAccount,
+        sourceCountry,
+        destinationCountry,
         description: [description.trim(), detail].filter(Boolean).join(" — "),
         feeAmount,
         taxAmount,
@@ -208,7 +213,7 @@ export function CreatePaymentDialog({
     },
     onSuccess: (payment) => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
-      if (upiMode) {
+      if (upiMode && isDemoMode()) {
         setAwaitingPayment(payment);
         return;
       }
@@ -224,7 +229,8 @@ export function CreatePaymentDialog({
     bankAccountNumber.trim().length >= 6 && ifscCode.trim().length >= 6;
   const invalid =
     amount <= 0 ||
-    (payeeAccountId !== null && payeeAccountId < 0) ||
+    sourceAccount.trim().length < 3 ||
+    destinationAccount.trim().length < 3 ||
     (cardMode && !cardValid) ||
     (needsBankDetails && !bankValid) ||
     (upiMode && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(upiId.trim())) ||
@@ -301,22 +307,20 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Pay to" hint="people & merchants">
-            <Select
-              value={String(payeeAccountId ?? "")}
-              onValueChange={(v) => setPayeeAccountId(Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DEMO_PAYEES.filter((a) => a.accountId !== payerAccountId).map((a) => (
-                  <SelectItem key={a.accountId} value={String(a.accountId)}>
-                    {a.name} · {a.bank}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Source account" hint="debited account">
+            <Input
+              value={sourceAccount}
+              onChange={(e) => setSourceAccount(e.target.value)}
+              placeholder="HDFC •••• 4821"
+            />
+          </Field>
+
+          <Field label="Destination account" hint="credited account">
+            <Input
+              value={destinationAccount}
+              onChange={(e) => setDestinationAccount(e.target.value)}
+              placeholder="ICICI •••• 1204"
+            />
           </Field>
 
           <Field label="Payment type">
@@ -353,7 +357,7 @@ export function CreatePaymentDialog({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>{cryptoMode ? "Crypto" : "Fiat"}</SelectLabel>
-                  {(cryptoMode ? CRYPTO_CURRENCIES : FIAT_CURRENCIES).map((c) => (
+                  {(cryptoMode ? cryptoCurrencies : fiatCurrencies).map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -370,7 +374,7 @@ export function CreatePaymentDialog({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Fiat</SelectLabel>
-                  {FIAT_CURRENCIES.map((c) => (
+                  {fiatCurrencies.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -378,7 +382,7 @@ export function CreatePaymentDialog({
                 </SelectGroup>
                 <SelectGroup>
                   <SelectLabel>Crypto</SelectLabel>
-                  {CRYPTO_CURRENCIES.map((c) => (
+                  {cryptoCurrencies.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -386,6 +390,22 @@ export function CreatePaymentDialog({
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </Field>
+
+          <Field label="Source country" hint="ISO country code">
+            <Input
+              value={sourceCountry}
+              onChange={(e) => setSourceCountry(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="US"
+            />
+          </Field>
+
+          <Field label="Destination country" hint="ISO country code">
+            <Input
+              value={destinationCountry}
+              onChange={(e) => setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))}
+              placeholder="IN"
+            />
           </Field>
 
           {/* Method-specific details */}
