@@ -537,14 +537,26 @@ export function getAuthUser(): AuthUser | null {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
+  const buildHeaders = (authToken?: string | null) => ({
+    "Content-Type": "application/json",
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(init?.headers ?? {}),
   });
+
+  let res = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers: buildHeaders(token),
+  });
+
+  // If a stale token is stored, retry once as anonymous so public endpoints still work.
+  if (res.status === 401 && token) {
+    setToken(null);
+    res = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers: buildHeaders(null),
+    });
+  }
+
   const text = await res.text();
   const body = text ? safeJson(text) : null;
   if (!res.ok) {
@@ -569,8 +581,7 @@ function safeJson(text: string) {
 const DEMO_KEY = "pp.demoMode";
 /** Demo mode serves data from the in-browser demo store (no backend required). */
 export function isDemoMode() {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(DEMO_KEY) === "on";
+  return false;
 }
 export function setDemoMode(on: boolean) {
   localStorage.setItem(DEMO_KEY, on ? "on" : "off");
