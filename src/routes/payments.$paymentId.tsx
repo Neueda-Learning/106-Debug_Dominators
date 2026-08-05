@@ -86,6 +86,20 @@ function PaymentDetailPage() {
 
   const p = payment.data;
 
+  const resolveParty = (
+    rawAccount: string | null | undefined,
+    id: number | null | undefined,
+    fallback: string,
+  ) => {
+    const raw = rawAccount?.trim();
+    if (raw) {
+      if (/^\d+$/.test(raw)) return accountName(Number(raw));
+      return raw;
+    }
+    if (id && id > 0) return accountName(id);
+    return fallback;
+  };
+
   return (
     <div className="min-h-screen">
       <AppHeader />
@@ -126,9 +140,15 @@ function PaymentDetailPage() {
               <div className="mt-6 grid gap-x-8 gap-y-4 border-t border-border pt-6 sm:grid-cols-2 lg:grid-cols-3">
                 <Detail label="Payment type" value={p.paymentType} />
                 <Detail label="Payment method" value={p.paymentMethod} />
-                <Detail label="Idempotency key" value={p.idempotencyKey} mono />
-                <Detail label="Paid from" value={accountName(p.payerAccountId)} />
-                <Detail label="Paid to" value={accountName(p.payeeAccountId)} />
+                <Detail label="Idempotency key" value={p.idempotencyKey || "—"} mono />
+                <Detail
+                  label="Paid from"
+                  value={resolveParty(p.sourceAccount, p.payerAccountId, "—")}
+                />
+                <Detail
+                  label="Paid to"
+                  value={resolveParty(p.destinationAccount, p.payeeAccountId, "—")}
+                />
                 <Detail label="Campaign" value={p.campaignId ?? "—"} />
                 <Detail label="Fee" value={formatAmount(p.feeAmount, p.sourceCurrencyCode)} />
                 <Detail label="Tax" value={formatAmount(p.taxAmount, p.sourceCurrencyCode)} />

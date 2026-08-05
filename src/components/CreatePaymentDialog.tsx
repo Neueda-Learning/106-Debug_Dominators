@@ -40,7 +40,7 @@ import {
   type CreatePaymentRequest,
   type Payment,
 } from "@/lib/api";
-import { CURRENT_USER, DEMO_PAYEES, accountName } from "@/lib/mock";
+import { CURRENT_USER } from "@/lib/mock";
 
 
 
@@ -66,7 +66,8 @@ export function CreatePaymentDialog({
   const queryClient = useQueryClient();
   const [payerAccountId, setPayerAccountId] = useState<number | null>(CURRENT_USER.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
-  const [payeeAccountId, setPayeeAccountId] = useState<number | null>(2);
+  const [sourceAccount, setSourceAccount] = useState("HDFC1023");
+  const [destinationAccount, setDestinationAccount] = useState("ICICI2024");
 
   const [amount, setAmount] = useState(100);
   const [sourceCurrencyCode, setSourceCurrencyCode] = useState("USD");
@@ -88,9 +89,6 @@ export function CreatePaymentDialog({
   useEffect(() => {
     const me = getAuthUser()?.userId ?? CURRENT_USER.accountId;
     setPayerAccountId(me);
-    setPayeeAccountId((p) =>
-      p === null || p === me ? (DEMO_PAYEES[0]?.accountId ?? null) : p,
-    );
     if (open) setAwaitingPayment(null);
   }, [open]);
 
@@ -174,7 +172,7 @@ export function CreatePaymentDialog({
     `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
 
   const methodDetail = () => {
-    const to = `To ${accountName(payeeAccountId)}`;
+    const to = `To ${destinationAccount.trim() || "destination"}`;
     if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
     if (upiMode) return `${to} · UPI: ${upiId.trim() || "fasterpay@upi"}`;
@@ -194,12 +192,14 @@ export function CreatePaymentDialog({
         paymentRef: randomRef("PAY"),
         idempotencyKey: randomRef("IDEM"),
         payerAccountId: payerAccountId ?? 0,
-        payeeAccountId,
+        payeeAccountId: null,
         paymentType: option.paymentType,
         paymentMethod: option.paymentMethod,
         amount,
         sourceCurrencyCode,
         settlementCurrencyCode,
+        sourceAccount: sourceAccount.trim(),
+        destinationAccount: destinationAccount.trim(),
         description: [description.trim(), detail].filter(Boolean).join(" — "),
         feeAmount,
         taxAmount,
@@ -224,7 +224,8 @@ export function CreatePaymentDialog({
     bankAccountNumber.trim().length >= 6 && ifscCode.trim().length >= 6;
   const invalid =
     amount <= 0 ||
-    (payeeAccountId !== null && payeeAccountId < 0) ||
+    sourceAccount.trim().length < 3 ||
+    destinationAccount.trim().length < 3 ||
     (cardMode && !cardValid) ||
     (needsBankDetails && !bankValid) ||
     (upiMode && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(upiId.trim())) ||
@@ -301,22 +302,20 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Pay to" hint="people & merchants">
-            <Select
-              value={String(payeeAccountId ?? "")}
-              onValueChange={(v) => setPayeeAccountId(Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DEMO_PAYEES.filter((a) => a.accountId !== payerAccountId).map((a) => (
-                  <SelectItem key={a.accountId} value={String(a.accountId)}>
-                    {a.name} · {a.bank}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="From account / bank ID" hint="sender account label">
+            <Input
+              value={sourceAccount}
+              onChange={(e) => setSourceAccount(e.target.value)}
+              placeholder="HDFC1023"
+            />
+          </Field>
+
+          <Field label="To account / bank ID" hint="receiver account label">
+            <Input
+              value={destinationAccount}
+              onChange={(e) => setDestinationAccount(e.target.value)}
+              placeholder="ICICI2024"
+            />
           </Field>
 
           <Field label="Payment type">
