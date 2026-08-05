@@ -34,9 +34,9 @@ export const Route = createFileRoute("/crowdfunding")({
 });
 
 const PRESETS = ["100", "250", "500", "custom"];
+const CAMPAIGN_IDS = ["1", "2", "3"];
 
 function CrowdfundingPage() {
-  const [campaignInput, setCampaignInput] = useState("1");
   const [campaignId, setCampaignId] = useState("1");
   const [preset, setPreset] = useState("100");
   const [customAmount, setCustomAmount] = useState("");
@@ -64,6 +64,14 @@ function CrowdfundingPage() {
   const amount = preset === "custom" ? Number(customAmount) : Number(preset);
   const remaining = progress.data ? Number(progress.data.remainingAmount) : null;
   const pct = progress.data ? Math.min(100, Number(progress.data.progressPercentage) || 0) : 0;
+  const campaignIndex = CAMPAIGN_IDS.indexOf(campaignId);
+
+  const goToCampaign = (index: number) => {
+    if (index < 0 || index >= CAMPAIGN_IDS.length) {
+      return;
+    }
+    setCampaignId(CAMPAIGN_IDS[index]);
+  };
 
   const contribute = useMutation({
     mutationFn: () =>
@@ -97,19 +105,6 @@ function CrowdfundingPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Track a campaign's progress and record contributions against it.
             </p>
-          </div>
-          <div className="flex items-end gap-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Campaign ID</Label>
-              <Input
-                className="w-28"
-                value={campaignInput}
-                onChange={(e) => setCampaignInput(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" onClick={() => setCampaignId(campaignInput || "1")}>
-              Load
-            </Button>
           </div>
         </div>
 
@@ -192,6 +187,35 @@ function CrowdfundingPage() {
                   ))}
                 </ul>
               )}
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToCampaign(campaignIndex - 1)}
+                  disabled={campaignIndex <= 0}
+                >
+                  &lt;
+                </Button>
+                {CAMPAIGN_IDS.map((id) => (
+                  <Button
+                    key={id}
+                    variant={campaignId === id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCampaignId(id)}
+                  >
+                    {id}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToCampaign(campaignIndex + 1)}
+                  disabled={campaignIndex === -1 || campaignIndex >= CAMPAIGN_IDS.length - 1}
+                >
+                  &gt;
+                </Button>
+              </div>
             </div>
           </div>
 
