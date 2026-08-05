@@ -114,7 +114,6 @@ function CrowdfundingPage() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mono-tag">GET /api/crowdfunding/campaigns/{"{id}"}</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">FasterPay CrowdFunding</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Track a campaign's progress and record contributions against it.
@@ -180,9 +179,6 @@ function CrowdfundingPage() {
             ) : null}
 
             <div className="mt-8 border-t border-border pt-6">
-              <p className="mono-tag">
-                GET /api/crowdfunding/campaigns/{campaignId}/contributions
-              </p>
               <h3 className="mt-1.5 text-base font-semibold">Contribution history</h3>
               {contributions.isLoading ? (
                 <Skeleton className="mt-4 h-20 w-full" />
@@ -240,7 +236,6 @@ function CrowdfundingPage() {
           </div>
 
           <div className="panel h-fit p-6">
-            <p className="mono-tag">POST /campaigns/{campaignId}/contributions</p>
             <h2 className="mt-1.5 flex items-center gap-2 text-lg font-semibold">
               <HeartHandshake className="size-4 text-primary" /> Contribute
             </h2>
