@@ -5,15 +5,41 @@ import { mockApi } from "./mock";
 // Base URL and JWT are stored in localStorage so the page can point at any
 // running backend instance (default: http://localhost:8080).
 
-export const PAYMENT_STATUSES = ["CREATED", "VALIDATED", "SENT", "COMPLETED", "FAILED"] as const;
-export const PAYMENT_METHODS = [
-  "BANK_TRANSFER",
-  "CARD",
-  "WALLET_BALANCE",
-  "CRYPTO_WALLET",
-  "INTERNAL_TRANSFER",
-  "MANUAL",
+// Mirrors payment_db.sql: payment.status and payment.payment_method enums.
+export const PAYMENT_STATUSES = [
+  "CREATED",
+  "VALIDATED",
+  "PROCESSING",
+  "COMPLETED",
+  "FAILED",
+  "REFUNDED",
+  "CANCELLED",
 ] as const;
+export const PAYMENT_METHODS = [
+  "UPI",
+  "CREDIT_CARD",
+  "DEBIT_CARD",
+  "NET_BANKING",
+  "WALLET",
+  "CRYPTO",
+] as const;
+
+/** payment_db.sql: refund.refund_status / refund_method / initiated_by. */
+export const REFUND_STATUSES = ["REQUESTED", "APPROVED", "PROCESSING", "COMPLETED", "REJECTED"] as const;
+export const REFUND_METHODS = ["ORIGINAL_PAYMENT_METHOD", "BANK_TRANSFER", "WALLET"] as const;
+/** payment_db.sql: refund_reason_master rows. */
+export const REFUND_REASONS = [
+  "Duplicate Payment",
+  "Gateway Timeout",
+  "Customer Request",
+  "Fraud Detection",
+  "Flight Cancellation",
+  "Order Cancellation",
+  "Payment Failure",
+] as const;
+
+/** Only failed payments are refundable in FasterPay. */
+export const isRefundable = (status: string) => status === "FAILED";
 export const PAYMENT_TYPES = [
   "NORMAL",
   "CRYPTO",
@@ -42,17 +68,17 @@ export const PAYMENT_OPTIONS = [
     id: "BANK_NATIONAL",
     label: "Bank Transfer — National",
     paymentType: "NORMAL",
-    paymentMethod: "BANK_TRANSFER",
+    paymentMethod: "NET_BANKING",
   },
   {
     id: "BANK_INTERNATIONAL",
     label: "Bank Transfer — International",
     paymentType: "INTERNATIONAL",
-    paymentMethod: "BANK_TRANSFER",
+    paymentMethod: "NET_BANKING",
   },
-  { id: "CREDIT_CARD", label: "Credit Card", paymentType: "NORMAL", paymentMethod: "CARD" },
-  { id: "UPI", label: "UPI", paymentType: "NORMAL", paymentMethod: "WALLET_BALANCE" },
-  { id: "CRYPTO", label: "Crypto", paymentType: "CRYPTO", paymentMethod: "CRYPTO_WALLET" },
+  { id: "CREDIT_CARD", label: "Credit Card", paymentType: "NORMAL", paymentMethod: "CREDIT_CARD" },
+  { id: "UPI", label: "UPI", paymentType: "NORMAL", paymentMethod: "UPI" },
+  { id: "CRYPTO", label: "Crypto", paymentType: "CRYPTO", paymentMethod: "CRYPTO" },
 ] as const;
 
 export type PaymentOptionId = (typeof PAYMENT_OPTIONS)[number]["id"];
@@ -144,6 +170,22 @@ export type Payment = {
   failedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
+export type RefundMethod = (typeof REFUND_METHODS)[number];
+
+export type Refund = {
+  refundId: number;
+  paymentId: number;
+  refundReference: string;
+  refundAmount: string | number;
+  refundReason: string;
+  refundStatus: RefundStatus;
+  refundMethod: RefundMethod;
+  initiatedBy: "CUSTOMER" | "ADMIN" | "SYSTEM";
+  refundDate: string;
+  remarks: string | null;
 };
 
 export type PaymentHistoryEntry = {
@@ -339,6 +381,20 @@ export const api = {
       ? mockApi.updatePaymentStatus(id, data)
       : request<Payment>(`/api/payments/${id}/status`, {
           method: "PUT",
+          body: JSON.stringify(data),
+        }),
+  // GET /api/payments/{id}/refunds
+  listRefunds: (id: number | string) =>
+    isDemoMode() ? mockApi.listRefunds(id) : request<Refund[]>(`/api/payments/${id}/refunds`),
+  // POST /api/payments/{id}/refunds
+  requestRefund: (
+    id: number | string,
+    data: { refundReason: string; refundMethod: RefundMethod; remarks?: string | null },
+  ) =>
+    isDemoMode()
+      ? mockApi.requestRefund(id, data)
+      : request<Refund>(`/api/payments/${id}/refunds`, {
+          method: "POST",
           body: JSON.stringify(data),
         }),
   // GET /api/crowdfunding/campaigns/{id}

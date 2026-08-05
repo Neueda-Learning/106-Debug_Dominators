@@ -9,7 +9,7 @@ export function AppHeader() {
           <span className="grid size-8 place-items-center rounded-md bg-primary/15 text-primary">
             <ShieldCheck className="size-4" />
           </span>
-          <span className="text-sm font-semibold tracking-tight">Ledger Payments Console</span>
+          <span className="text-sm font-semibold tracking-tight">FasterPay</span>
         </Link>
         <nav className="ml-auto hidden items-center gap-1 text-sm md:flex">
           <Link

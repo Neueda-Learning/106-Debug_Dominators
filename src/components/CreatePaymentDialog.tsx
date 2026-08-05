@@ -40,7 +40,7 @@ import {
   type CreatePaymentRequest,
   type Payment,
 } from "@/lib/api";
-import { DEMO_ACCOUNTS, accountName } from "@/lib/mock";
+import { CURRENT_USER, DEMO_PAYEES, accountName } from "@/lib/mock";
 
 
 
@@ -64,7 +64,7 @@ export function CreatePaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [payerAccountId, setPayerAccountId] = useState<number | null>(DEMO_ACCOUNTS[0]!.accountId);
+  const [payerAccountId, setPayerAccountId] = useState<number | null>(CURRENT_USER.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
   const [payeeAccountId, setPayeeAccountId] = useState<number | null>(2);
 
@@ -86,10 +86,10 @@ export function CreatePaymentDialog({
   const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
-    const me = getAuthUser()?.userId ?? DEMO_ACCOUNTS[0]!.accountId;
+    const me = getAuthUser()?.userId ?? CURRENT_USER.accountId;
     setPayerAccountId(me);
     setPayeeAccountId((p) =>
-      p === null || p === me ? (DEMO_ACCOUNTS.find((a) => a.accountId !== me)?.accountId ?? null) : p,
+      p === null || p === me ? (DEMO_PAYEES[0]?.accountId ?? null) : p,
     );
     if (open) setAwaitingPayment(null);
   }, [open]);
@@ -117,9 +117,9 @@ export function CreatePaymentDialog({
 
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
-  const cryptoMode = option.paymentMethod === "CRYPTO_WALLET";
-  const bankMode_ = option.paymentMethod === "BANK_TRANSFER";
-  const cardMode = option.paymentMethod === "CARD";
+  const cryptoMode = option.paymentMethod === "CRYPTO";
+  const bankMode_ = option.paymentMethod === "NET_BANKING";
+  const cardMode = option.paymentMethod === "CREDIT_CARD";
   const upiMode = optionId === "UPI";
   const settlementIsCrypto = isCryptoCurrency(settlementCurrencyCode);
   const cryptoNeedsBank = cryptoMode && !settlementIsCrypto;
@@ -145,13 +145,13 @@ export function CreatePaymentDialog({
   );
 
   const upiPayload = useMemo(() => {
-    const pa = upiId.trim() || "merchant@ledger";
+    const pa = upiId.trim() || "fasterpay@upi";
     const params = new URLSearchParams({
       pa,
-      pn: "Ledger Payments",
+      pn: "FasterPay",
       am: total.toFixed(2),
       cu: sourceCurrencyCode === "INR" ? "INR" : sourceCurrencyCode,
-      tn: description.trim() || "Ledger payment",
+      tn: description.trim() || "FasterPay payment",
     });
     return `upi://pay?${params.toString()}`;
   }, [upiId, total, sourceCurrencyCode, description]);
@@ -159,7 +159,7 @@ export function CreatePaymentDialog({
   const onOptionChange = (id: PaymentOptionId) => {
     setOptionId(id);
     const next = PAYMENT_OPTIONS.find((o) => o.id === id)!;
-    const nextCrypto = next.paymentMethod === "CRYPTO_WALLET";
+    const nextCrypto = next.paymentMethod === "CRYPTO";
     setBankMode(id === "BANK_INTERNATIONAL" ? "SWIFT" : "NEFT");
     setSourceCurrencyCode((cur) => {
       const isCryptoCur = (CRYPTO_CURRENCIES as readonly string[]).includes(cur);
@@ -177,7 +177,7 @@ export function CreatePaymentDialog({
     const to = `To ${accountName(payeeAccountId)}`;
     if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
-    if (upiMode) return `${to} · UPI: ${upiId.trim() || "merchant@ledger"}`;
+    if (upiMode) return `${to} · UPI: ${upiId.trim() || "fasterpay@upi"}`;
 
     if (cryptoMode)
       return cryptoNeedsBank
@@ -244,7 +244,7 @@ export function CreatePaymentDialog({
             </DialogTitle>
             <DialogDescription>
               {awaitingPayment.paymentRef} · {total} {sourceCurrencyCode} to{" "}
-              {upiId.trim() || "merchant@ledger"}
+              {upiId.trim() || "fasterpay@upi"}
             </DialogDescription>
           </DialogHeader>
 
@@ -301,7 +301,7 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Pay to" hint="demo accounts">
+          <Field label="Pay to" hint="people & merchants">
             <Select
               value={String(payeeAccountId ?? "")}
               onValueChange={(v) => setPayeeAccountId(Number(v))}
@@ -310,7 +310,7 @@ export function CreatePaymentDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DEMO_ACCOUNTS.filter((a) => a.accountId !== payerAccountId).map((a) => (
+                {DEMO_PAYEES.filter((a) => a.accountId !== payerAccountId).map((a) => (
                   <SelectItem key={a.accountId} value={String(a.accountId)}>
                     {a.name} · {a.bank}
                   </SelectItem>

@@ -4,6 +4,8 @@
 
 import type {
   Campaign,
+  Refund,
+  RefundMethod,
   CampaignProgress,
   Contribution,
   CreatePaymentRequest,
@@ -17,20 +19,32 @@ export type DemoAccount = {
   name: string;
   email: string;
   bank: string;
+  kind: "self" | "person" | "merchant";
 };
 
-/** Demo people available as payer / payee. */
-export const DEMO_ACCOUNTS: DemoAccount[] = [
-  { accountId: 1, name: "Aarav Sharma", email: "aarav.sharma@demo.io", bank: "HDFC •••4821" },
-  { accountId: 2, name: "Emily Chen", email: "emily.chen@demo.io", bank: "Chase •••7710" },
-  { accountId: 3, name: "Marcus Feld", email: "marcus.feld@demo.io", bank: "N26 •••3390" },
-  { accountId: 4, name: "Priya Nair", email: "priya.nair@demo.io", bank: "ICICI •••1204" },
+/** FasterPay is single-user: Nick pays out to people and merchants. */
+export const CURRENT_USER: DemoAccount = {
+  accountId: 1,
+  name: "Nick Carter",
+  email: "nick@fasterpay.io",
+  bank: "HDFC \u2022\u2022\u20224821",
+  kind: "self",
+};
+
+/** Payees Nick can send money to. */
+export const DEMO_PAYEES: DemoAccount[] = [
+  { accountId: 2, name: "Priya Nair", email: "priya.nair@demo.io", bank: "ICICI \u2022\u2022\u20221204", kind: "person" },
+  { accountId: 3, name: "Marcus Feld", email: "marcus.feld@demo.io", bank: "N26 \u2022\u2022\u20223390", kind: "person" },
+  { accountId: 4, name: "Amazon", email: "billing@amazon.com", bank: "Amazon Pay merchant", kind: "merchant" },
+  { accountId: 5, name: "Netflix", email: "billing@netflix.com", bank: "Netflix merchant", kind: "merchant" },
 ];
 
-export const accountName = (id: number | null | undefined) =>
-  DEMO_ACCOUNTS.find((a) => a.accountId === id)?.name ?? (id ? `Account #${id}` : "—");
+export const DEMO_ACCOUNTS: DemoAccount[] = [CURRENT_USER, ...DEMO_PAYEES];
 
-const STORE_KEY = "pp.demoStore.v1";
+export const accountName = (id: number | null | undefined) =>
+  DEMO_ACCOUNTS.find((a) => a.accountId === id)?.name ?? (id ? `Account #${id}` : "\u2014");
+
+const STORE_KEY = "pp.demoStore.v3";
 const UPI_SETTLE_MS = 5000;
 
 type Store = {
@@ -38,6 +52,8 @@ type Store = {
   history: PaymentHistoryEntry[];
   campaigns: Campaign[];
   contributions: Contribution[];
+  refunds: Refund[];
+  nextRefundId: number;
   nextPaymentId: number;
   nextHistoryId: number;
   nextContributionId: number;
@@ -91,70 +107,18 @@ function seed(): Store {
   });
 
   const payments: Payment[] = [
-    mk(
-      1001,
-      "PAY-AARAV01",
-      1,
-      2,
-      "NORMAL",
-      "BANK_TRANSFER",
-      "COMPLETED",
-      2400,
-      "USD",
-      "USD",
-      18,
-      0,
-      "Aarav Sharma → Emily Chen — Bank transfer mode: NEFT · A/C 123456789012 · IFSC HDFC0001234",
-      620,
-    ),
-    mk(
-      1002,
-      "PAY-EMILY02",
-      2,
-      3,
-      "NORMAL",
-      "CARD",
-      "SENT",
-      180,
-      "EUR",
-      "EUR",
-      0.9,
-      36,
-      "Emily Chen → Marcus Feld — Card •••710 exp 09/28",
-      145,
-    ),
-    mk(
-      1003,
-      "PAY-PRIYA03",
-      4,
-      1,
-      "NORMAL",
-      "WALLET_BALANCE",
-      "COMPLETED",
-      7500,
-      "INR",
-      "INR",
-      0,
-      1350,
-      "Priya Nair → Aarav Sharma — UPI: priya@icici",
-      52,
-    ),
-    mk(
-      1004,
-      "PAY-MARCUS4",
-      3,
-      4,
-      "CRYPTO",
-      "CRYPTO_WALLET",
-      "FAILED",
-      0.35,
-      "ETH",
-      "USD",
-      8.93,
-      0,
-      "Marcus Feld → Priya Nair — Wallet: 0x8f2c…a41d · payout 1198.93 USD to A/C 998877665544 · IFSC ICIC0000123",
-      18,
-    ),
+    mk(1001, "PAY000001", 1, 2, "NORMAL", "UPI", "COMPLETED", 7500, "INR", "INR", 0, 1350,
+      "Nick Carter \u2192 Priya Nair \u2014 UPI: priya@icici", 620),
+    mk(1002, "PAY000002", 1, 3, "INTERNATIONAL", "NET_BANKING", "PROCESSING", 2400, "USD", "EUR", 18, 0,
+      "Nick Carter \u2192 Marcus Feld \u2014 Bank transfer mode: SWIFT \u00b7 A/C 123456789012 \u00b7 IFSC HDFC0001234", 145),
+    mk(1003, "PAY000003", 1, 4, "NORMAL", "CREDIT_CARD", "COMPLETED", 1450, "INR", "INR", 7.25, 261,
+      "Nick Carter \u2192 Amazon \u2014 Card \u2022\u2022\u2022821 exp 09/28 \u00b7 Amazon Shopping", 52),
+    mk(1004, "PAY000004", 1, 5, "NORMAL", "CREDIT_CARD", "FAILED", 999, "INR", "INR", 4.99, 179.82,
+      "Nick Carter \u2192 Netflix \u2014 Card \u2022\u2022\u2022821 exp 09/28 \u00b7 Netflix Subscription", 18),
+    mk(1005, "PAY000005", 1, 3, "CRYPTO", "CRYPTO", "FAILED", 0.35, "ETH", "USD", 8.93, 0,
+      "Nick Carter \u2192 Marcus Feld \u2014 Wallet: 0x8f2c\u2026a41d \u00b7 payout 1198.93 USD to A/C 998877665544 \u00b7 IFSC ICIC0000123", 12),
+    mk(1006, "PAY000006", 1, 4, "NORMAL", "UPI", "REFUNDED", 2400, "INR", "INR", 12, 432,
+      "Nick Carter \u2192 Amazon \u2014 UPI: amazon@upi \u00b7 Duplicate Payment", 900),
   ];
 
   const history: PaymentHistoryEntry[] = [];
@@ -162,9 +126,11 @@ function seed(): Store {
   const chain: Record<PaymentStatus, PaymentStatus[]> = {
     CREATED: ["CREATED"],
     VALIDATED: ["CREATED", "VALIDATED"],
-    SENT: ["CREATED", "VALIDATED", "SENT"],
-    COMPLETED: ["CREATED", "VALIDATED", "SENT", "COMPLETED"],
+    PROCESSING: ["CREATED", "VALIDATED", "PROCESSING"],
+    COMPLETED: ["CREATED", "VALIDATED", "PROCESSING", "COMPLETED"],
     FAILED: ["CREATED", "VALIDATED", "FAILED"],
+    CANCELLED: ["CREATED", "CANCELLED"],
+    REFUNDED: ["CREATED", "VALIDATED", "PROCESSING", "COMPLETED", "REFUNDED"],
   };
   for (const p of payments) {
     const steps = chain[p.status];
@@ -225,12 +191,29 @@ function seed(): Store {
     },
   ];
 
+  const refunds: Refund[] = [
+    {
+      refundId: 7001,
+      paymentId: 1006,
+      refundReference: "RFD000001",
+      refundAmount: 2400,
+      refundReason: "Duplicate Payment",
+      refundStatus: "COMPLETED",
+      refundMethod: "ORIGINAL_PAYMENT_METHOD",
+      initiatedBy: "CUSTOMER",
+      refundDate: iso(-880 * 60000),
+      remarks: "Refund credited to original payment method",
+    },
+  ];
+
   return {
     payments,
     history,
     campaigns,
     contributions,
-    nextPaymentId: 1005,
+    refunds,
+    nextRefundId: 7002,
+    nextPaymentId: 1007,
     nextHistoryId: hid,
     nextContributionId: 9003,
     upiSettleAt: {},
@@ -284,8 +267,8 @@ function settleDueUpi(store: Store) {
     const payment = store.payments.find((p) => p.paymentId === Number(id));
     if (payment && payment.status !== "COMPLETED") {
       pushHistory(store, payment.paymentId, payment.status, "VALIDATED");
-      pushHistory(store, payment.paymentId, "VALIDATED", "SENT");
-      pushHistory(store, payment.paymentId, "SENT", "COMPLETED", "UPI_COLLECTED");
+      pushHistory(store, payment.paymentId, "VALIDATED", "PROCESSING");
+      pushHistory(store, payment.paymentId, "PROCESSING", "COMPLETED", "UPI_COLLECTED");
       payment.status = "COMPLETED";
       payment.completedAt = new Date().toISOString();
       payment.updatedAt = payment.completedAt;
@@ -329,7 +312,7 @@ export const mockApi = {
   },
   async createPayment(data: CreatePaymentRequest) {
     const store = load();
-    const isUpi = data.paymentMethod === "WALLET_BALANCE";
+    const isUpi = data.paymentMethod === "UPI";
     const now = new Date().toISOString();
     const fee = Number(data.feeAmount ?? 0);
     const tax = Number(data.taxAmount ?? 0);
@@ -365,7 +348,8 @@ export const mockApi = {
       store.upiSettleAt[String(payment.paymentId)] = Date.now() + UPI_SETTLE_MS;
     } else {
       pushHistory(store, payment.paymentId, "CREATED", "VALIDATED");
-      payment.status = "VALIDATED";
+      pushHistory(store, payment.paymentId, "VALIDATED", "PROCESSING", "GATEWAY", "Sent to gateway");
+      payment.status = "PROCESSING";
       payment.updatedAt = new Date().toISOString();
     }
     save(store);
@@ -386,6 +370,47 @@ export const mockApi = {
     delete store.upiSettleAt[String(payment.paymentId)];
     save(store);
     return delay({ ...payment }, 200);
+  },
+  async listRefunds(id: number | string) {
+    const store = load();
+    return delay(store.refunds.filter((r) => r.paymentId === Number(id)));
+  },
+  async requestRefund(
+    id: number | string,
+    data: { refundReason: string; refundMethod: RefundMethod; remarks?: string | null },
+  ) {
+    const store = load();
+    const payment = store.payments.find((p) => p.paymentId === Number(id));
+    if (!payment) throw new Error(`Payment ${id} not found`);
+    if (payment.status !== "FAILED")
+      throw new Error("Only failed payments can be refunded");
+    if (store.refunds.some((r) => r.paymentId === payment.paymentId))
+      throw new Error("A refund has already been requested for this payment");
+    const refund: Refund = {
+      refundId: store.nextRefundId++,
+      paymentId: payment.paymentId,
+      refundReference: `RFD${String(store.nextRefundId).padStart(6, "0")}`,
+      refundAmount: Number(payment.netAmount ?? payment.amount),
+      refundReason: data.refundReason,
+      refundStatus: "REQUESTED",
+      refundMethod: data.refundMethod,
+      initiatedBy: "CUSTOMER",
+      refundDate: new Date().toISOString(),
+      remarks: data.remarks?.trim() || "Customer requested refund",
+    };
+    store.refunds.push(refund);
+    pushHistory(
+      store,
+      payment.paymentId,
+      payment.status,
+      "REFUNDED",
+      "REFUND_REQUESTED",
+      `${refund.refundReference} \u00b7 ${refund.refundReason}`,
+    );
+    payment.status = "REFUNDED";
+    payment.updatedAt = new Date().toISOString();
+    save(store);
+    return delay({ ...refund }, 300);
   },
   async getCampaign(id: number | string) {
     const store = load();
@@ -442,8 +467,8 @@ export const mockApi = {
     save(store);
     return delay({ ...contribution }, 300);
   },
-  async login(email: string) {
-    const account = DEMO_ACCOUNTS.find((a) => a.email === email) ?? DEMO_ACCOUNTS[0]!;
+  async login(_email: string) {
+    const account = CURRENT_USER;
     return delay({
       token: "demo-token",
       tokenType: "Bearer",

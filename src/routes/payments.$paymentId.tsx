@@ -16,12 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  PAYMENT_STATUSES,
+  REFUND_METHODS,
+  REFUND_REASONS,
   api,
   formatAmount,
   formatDateTime,
-  type PaymentStatus,
+  isRefundable,
+  type RefundMethod,
 } from "@/lib/api";
+import { accountName } from "@/lib/mock";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/payments/$paymentId")({
@@ -46,9 +49,9 @@ export const Route = createFileRoute("/payments/$paymentId")({
 function PaymentDetailPage() {
   const { paymentId } = Route.useParams();
   const queryClient = useQueryClient();
-  const [nextStatus, setNextStatus] = useState<PaymentStatus>("VALIDATED");
-  const [reasonCode, setReasonCode] = useState("");
-  const [reasonMessage, setReasonMessage] = useState("");
+  const [refundReason, setRefundReason] = useState<string>(REFUND_REASONS[0]);
+  const [refundMethod, setRefundMethod] = useState<RefundMethod>("ORIGINAL_PAYMENT_METHOD");
+  const [remarks, setRemarks] = useState("");
 
   const payment = useQuery({
     queryKey: ["payment", paymentId],
@@ -61,22 +64,24 @@ function PaymentDetailPage() {
     retry: false,
   });
 
-  const update = useMutation({
+  const refunds = useQuery({
+    queryKey: ["refunds", paymentId],
+    queryFn: () => api.listRefunds(paymentId),
+    retry: false,
+  });
+
+  const requestRefund = useMutation({
     mutationFn: () =>
-      api.updatePaymentStatus(paymentId, {
-        status: nextStatus,
-        reasonCode: reasonCode || undefined,
-        reasonMessage: reasonMessage || undefined,
-      }),
-    onSuccess: (p) => {
-      toast.success(`Status updated to ${p.status}`);
+      api.requestRefund(paymentId, { refundReason, refundMethod, remarks: remarks || null }),
+    onSuccess: (r) => {
+      toast.success(`Refund ${r.refundReference} requested`);
       queryClient.invalidateQueries({ queryKey: ["payment", paymentId] });
       queryClient.invalidateQueries({ queryKey: ["payment-history", paymentId] });
+      queryClient.invalidateQueries({ queryKey: ["refunds", paymentId] });
       queryClient.invalidateQueries({ queryKey: ["payments"] });
-      setReasonCode("");
-      setReasonMessage("");
+      setRemarks("");
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Transition rejected"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Refund request rejected"),
   });
 
   const p = payment.data;
@@ -123,8 +128,8 @@ function PaymentDetailPage() {
                 <Detail label="Payment type" value={p.paymentType} />
                 <Detail label="Payment method" value={p.paymentMethod} />
                 <Detail label="Idempotency key" value={p.idempotencyKey} mono />
-                <Detail label="Payer account" value={p.payerAccountId} />
-                <Detail label="Payee account" value={p.payeeAccountId ?? "—"} />
+                <Detail label="Paid from" value={accountName(p.payerAccountId)} />
+                <Detail label="Paid to" value={accountName(p.payeeAccountId)} />
                 <Detail label="Campaign" value={p.campaignId ?? "—"} />
                 <Detail label="Fee" value={formatAmount(p.feeAmount, p.sourceCurrencyCode)} />
                 <Detail label="Tax" value={formatAmount(p.taxAmount, p.sourceCurrencyCode)} />
@@ -186,54 +191,91 @@ function PaymentDetailPage() {
               </div>
 
               <div className="panel h-fit p-6">
-                <p className="mono-tag">PUT /api/payments/{p.paymentId}/status</p>
-                <h2 className="mt-1.5 text-lg font-semibold">Advance lifecycle</h2>
-                <div className="mt-4 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Next status</Label>
-                    <Select
-                      value={nextStatus}
-                      onValueChange={(v) => setNextStatus(v as PaymentStatus)}
+                <p className="mono-tag">POST /api/payments/{p.paymentId}/refunds</p>
+                <h2 className="mt-1.5 text-lg font-semibold">Refund</h2>
+
+                {(refunds.data ?? []).length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {(refunds.data ?? []).map((r) => (
+                      <div key={r.refundId} className="rounded-md border border-border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs">{r.refundReference}</span>
+                          <StatusBadge status={r.refundStatus} />
+                        </div>
+                        <p className="mt-2 text-sm">
+                          {formatAmount(r.refundAmount, p.sourceCurrencyCode)} · {r.refundReason}
+                        </p>
+                        <p className="mono-tag mt-1">
+                          {r.refundMethod} · by {r.initiatedBy} · {formatDateTime(r.refundDate)}
+                        </p>
+                        {r.remarks ? (
+                          <p className="mt-1.5 text-xs text-muted-foreground">{r.remarks}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : isRefundable(p.status) ? (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      This payment failed, so you can request a refund of{" "}
+                      {formatAmount(p.netAmount ?? p.amount, p.sourceCurrencyCode)}.
+                    </p>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Reason</Label>
+                      <Select value={refundReason} onValueChange={setRefundReason}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REFUND_REASONS.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Refund to</Label>
+                      <Select
+                        value={refundMethod}
+                        onValueChange={(v) => setRefundMethod(v as RefundMethod)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REFUND_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m.replaceAll("_", " ").toLowerCase()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Remarks</Label>
+                      <Input
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        placeholder="Optional note for support"
+                      />
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => requestRefund.mutate()}
+                      disabled={requestRefund.isPending}
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {requestRefund.isPending ? "Requesting…" : "Request refund"}
+                    </Button>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Reason code</Label>
-                    <Input
-                      value={reasonCode}
-                      onChange={(e) => setReasonCode(e.target.value)}
-                      placeholder="E.g. INSUFFICIENT_FUNDS"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Reason message</Label>
-                    <Input
-                      value={reasonMessage}
-                      onChange={(e) => setReasonMessage(e.target.value)}
-                      placeholder="Optional detail"
-                    />
-                  </div>
-                  <Button
-                    className="w-full"
-                    onClick={() => update.mutate()}
-                    disabled={update.isPending}
-                  >
-                    {update.isPending ? "Updating…" : `Set ${nextStatus}`}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Invalid transitions are rejected by the backend and surfaced here.
+                ) : (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Refunds are only available for FAILED payments. Statuses such as CREATED,
+                    VALIDATED, PROCESSING and COMPLETED are set by FasterPay and the payment
+                    gateway — they can't be changed from this console.
                   </p>
-                </div>
+                )}
               </div>
             </div>
           </>
