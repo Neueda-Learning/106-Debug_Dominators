@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.paymentprocessing.payment_processing_system.controller.AuditLogControllerTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.307 s -- in com.paymentprocessing.payment_processing_system.controller.AuditLogControllerTest

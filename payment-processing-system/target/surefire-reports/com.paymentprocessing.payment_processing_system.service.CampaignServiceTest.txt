@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.paymentprocessing.payment_processing_system.service.CampaignServiceTest
+-------------------------------------------------------------------------------
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.300 s -- in com.paymentprocessing.payment_processing_system.service.CampaignServiceTest
