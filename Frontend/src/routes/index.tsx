@@ -64,6 +64,7 @@ function PaymentsPage() {
   const query = useQuery({
     queryKey: ["payments", status],
     queryFn: () => (status === "ALL" ? api.listPayments() : api.listPaymentsByStatus(status)),
+    refetchInterval: 2000,
     retry: false,
   });
 

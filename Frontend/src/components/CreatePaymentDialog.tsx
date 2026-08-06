@@ -243,6 +243,10 @@ export function CreatePaymentDialog({
     },
     onSuccess: (payment) => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
+      if (upiMode) {
+        setAwaitingPayment(payment);
+        return;
+      }
       toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       onOpenChange(false);
     },
