@@ -39,6 +39,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh 'docker rm -f mysql_container || true'
+                sh 'docker rm -f springboot_container || true'
+                sh 'docker rm -f frontend_container || true'
                 sh 'docker-compose up -d'
             }
         }
