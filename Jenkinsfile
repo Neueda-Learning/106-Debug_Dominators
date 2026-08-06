@@ -19,6 +19,7 @@ pipeline {
         stage('Build Spring Boot') {
             steps {
                 sh 'mvn clean package -DskipTests'
+<<<<<<< HEAD
             }
         }
 
@@ -43,6 +44,32 @@ pipeline {
 
         stage('Verify') {
             steps {
+=======
+            }
+        }
+       
+
+        stage('Stop Existing Containers') {
+            steps {
+                sh 'docker-compose down || true'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker-compose build --no-cache'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh 'docker-compose up -d'
+            }
+        }
+
+        stage('Verify') {
+            steps {
+>>>>>>> 56849aaa29a275be826275c925c81374813ad554
                 sh 'docker ps'
             }
         }
