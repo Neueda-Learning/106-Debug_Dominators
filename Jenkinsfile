@@ -172,21 +172,21 @@ if ! ${composeCmd} --env-file .env up -d --build mysql; then
     exit 1
 fi
 
-MYSQL_CONTAINER="${COMPOSE_PROJECT_NAME}-mysql-1"
-for i in $(seq 1 40); do
-    MYSQL_STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${MYSQL_CONTAINER}" 2>/dev/null || true)
-    if [ "${MYSQL_STATUS}" = "healthy" ]; then
+MYSQL_CONTAINER="\${COMPOSE_PROJECT_NAME}-mysql-1"
+for i in \$(seq 1 40); do
+    MYSQL_STATUS=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "\${MYSQL_CONTAINER}" 2>/dev/null || true)
+    if [ "\${MYSQL_STATUS}" = "healthy" ]; then
         echo "MySQL is healthy."
         break
     fi
-    if [ "${MYSQL_STATUS}" = "exited" ] || [ "${MYSQL_STATUS}" = "dead" ]; then
-        echo "MySQL container is not running (status=${MYSQL_STATUS})."
+    if [ "\${MYSQL_STATUS}" = "exited" ] || [ "\${MYSQL_STATUS}" = "dead" ]; then
+        echo "MySQL container is not running (status=\${MYSQL_STATUS})."
         ${composeCmd} --env-file .env logs --tail=200 mysql || true
         exit 1
     fi
-    echo "Waiting for MySQL health... (${i}/40, status=${MYSQL_STATUS:-starting})"
+    echo "Waiting for MySQL health... (\${i}/40, status=\${MYSQL_STATUS:-starting})"
     sleep 5
-    if [ "${i}" -eq 40 ]; then
+    if [ "\${i}" -eq 40 ]; then
         echo "MySQL did not become healthy in time."
         ${composeCmd} --env-file .env logs --tail=200 mysql || true
         exit 1
