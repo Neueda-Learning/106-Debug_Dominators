@@ -1,8 +1,8 @@
 package com.paymentprocessing.payment_processing_system.config;
 
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,9 +18,13 @@ public class SwaggerConfig {
                 .info(
                         new Info()
                                 .title("Payment Processing System API")
-                                .version("1.0")
+                                .version("1.0.0")
                                 .description(
-                                        "API documentation for Payment Processing System"
+                                        "REST API documentation for Payment Processing System developed by Debug Dominators"
+                                )
+                                .contact(
+                                        new Contact()
+                                                .name("Debug Dominators")
                                 )
                 );
     }

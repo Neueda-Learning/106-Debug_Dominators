@@ -20,14 +20,17 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
-                        // Swagger endpoints
+
+                        // Swagger
                         .requestMatchers(
-                                "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/v3/api-docs/**"
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/webjars/**"
                         ).permitAll()
 
-                        // Application APIs
+
+                        // APIs
                         .requestMatchers(
                                 "/payments/**",
                                 "/refunds/**",
@@ -36,7 +39,8 @@ public class SecurityConfig {
                                 "/contributions/**",
                                 "/payment-history/**",
                                 "/notifications/**",
-                                "/audit-logs/**"
+                                "/audit-logs/**",
+                                "/statements/**"
                         ).permitAll()
 
 

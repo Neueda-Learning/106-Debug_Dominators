@@ -3,12 +3,9 @@ package com.paymentprocessing.payment_processing_system.service.impl;
 
 import com.paymentprocessing.payment_processing_system.dto.ContributionRequest;
 import com.paymentprocessing.payment_processing_system.dto.ContributionResponse;
-import com.paymentprocessing.payment_processing_system.exception.CampaignException;
 import com.paymentprocessing.payment_processing_system.enums.ContributionStatus;
 import com.paymentprocessing.payment_processing_system.exception.ContributionException;
-import com.paymentprocessing.payment_processing_system.model.Campaign;
 import com.paymentprocessing.payment_processing_system.model.Contribution;
-import com.paymentprocessing.payment_processing_system.repository.CampaignRepository;
 import com.paymentprocessing.payment_processing_system.repository.ContributionRepository;
 import com.paymentprocessing.payment_processing_system.service.ContributionService;
 
@@ -34,16 +31,12 @@ public class ContributionServiceImpl implements ContributionService {
 
     private final ContributionRepository contributionRepository;
 
-        private final CampaignRepository campaignRepository;
-
 
 
     public ContributionServiceImpl(
-                        ContributionRepository contributionRepository,
-                        CampaignRepository campaignRepository) {
+            ContributionRepository contributionRepository) {
 
         this.contributionRepository = contributionRepository;
-                this.campaignRepository = campaignRepository;
     }
 
 
@@ -117,24 +110,6 @@ public class ContributionServiceImpl implements ContributionService {
 
         Contribution savedContribution =
                 contributionRepository.save(contribution);
-
-
-        Campaign campaign =
-                campaignRepository.findById(request.getCampaignId())
-                        .orElseThrow(() -> new CampaignException(
-                                "Campaign not found with id: "
-                                        + request.getCampaignId()
-                        ));
-
-
-        campaign.setCollectedAmount(
-                campaign.getCollectedAmount().add(
-                        request.getContributionAmount()
-                )
-        );
-
-
-        campaignRepository.save(campaign);
 
 
 
