@@ -193,11 +193,29 @@ for i in \$(seq 1 40); do
     fi
 done
 
-if ! ${composeCmd} --env-file .env up -d --build --remove-orphans backend frontend; then
+${composeCmd} --env-file .env up -d --build --remove-orphans backend frontend || true
+
+BACKEND_CONTAINER="\${COMPOSE_PROJECT_NAME}-backend-1"
+BACKEND_READY=""
+for i in \$(seq 1 24); do
+    BACKEND_STATUS=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "\${BACKEND_CONTAINER}" 2>/dev/null || true)
+    if [ "\${BACKEND_STATUS}" = "healthy" ] || [ "\${BACKEND_STATUS}" = "running" ]; then
+        echo "Backend container is \${BACKEND_STATUS}."
+        BACKEND_READY="yes"
+        break
+    fi
+    echo "Waiting for backend container to recover (Docker will auto-restart it)... (\${i}/24, status=\${BACKEND_STATUS:-unknown})"
+    sleep 5
+done
+
+if [ -z "\${BACKEND_READY}" ]; then
+    echo "Backend container did not recover in time."
     ${composeCmd} --env-file .env ps || true
-    ${composeCmd} --env-file .env logs --tail=200 backend mysql frontend || true
+    ${composeCmd} --env-file .env logs --tail=200 backend mysql || true
     exit 1
 fi
+
+${composeCmd} --env-file .env up -d --build --remove-orphans frontend || true
 """
                         sh "${composeCmd} --env-file .env ps"
                     }
