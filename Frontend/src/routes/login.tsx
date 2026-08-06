@@ -23,8 +23,8 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("debug");
-  const [password, setPassword] = useState("n3u3da!");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const loginMutation = useMutation({
     mutationFn: () => api.login(username, password),
@@ -62,7 +62,7 @@ function LoginPage() {
               id="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="debug"
+              placeholder="Enter username"
             />
           </div>
 
@@ -73,7 +73,7 @@ function LoginPage() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="n3u3da!"
+              placeholder="Enter password"
             />
           </div>
 
@@ -81,10 +81,6 @@ function LoginPage() {
             {loginMutation.isPending ? "Logging in..." : "Login"}
           </Button>
         </form>
-
-        <p className="mt-4 text-xs text-muted-foreground">
-          Default credentials: username debug and password n3u3da!
-        </p>
       </div>
     </div>
   );
