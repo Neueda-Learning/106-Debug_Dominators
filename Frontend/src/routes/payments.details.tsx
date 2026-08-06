@@ -24,7 +24,7 @@ import {
   isRefundable,
   type RefundMethod,
 } from "@/lib/api";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Download } from "lucide-react";
 
 export const Route = createFileRoute("/payments/details")({
   head: () => ({
@@ -93,6 +93,22 @@ function PaymentDetailPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Refund request rejected"),
   });
 
+  const downloadStatement = useMutation({
+    mutationFn: () => api.downloadPaymentStatement(paymentId!),
+    onSuccess: (blob) => {
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `payment_statement_${String(paymentId)}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+      toast.success("Statement downloaded");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to download statement"),
+  });
+
   const p = payment.data;
 
   const resolveParty = (
@@ -148,6 +164,16 @@ function PaymentDetailPage() {
                   <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
                     {formatAmount(p.amount, p.sourceCurrencyCode)}
                   </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => downloadStatement.mutate()}
+                    disabled={downloadStatement.isPending}
+                  >
+                    <Download className="mr-1.5 size-4" />
+                    {downloadStatement.isPending ? "Preparing PDF…" : "Download statement"}
+                  </Button>
                 </div>
               </div>
 
