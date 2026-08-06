@@ -6,31 +6,29 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
-
 @Configuration
 public class SecurityConfig {
-
 
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http) throws Exception {
-
 
         http
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Swagger
+                        // Swagger - Public Access
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/webjars/**"
-                        ).permitAll()
+                        )
+                        .permitAll()
 
 
-                        // APIs
+                        // All Application APIs - Protected
                         .requestMatchers(
                                 "/payments/**",
                                 "/refunds/**",
@@ -40,11 +38,16 @@ public class SecurityConfig {
                                 "/payment-history/**",
                                 "/notifications/**",
                                 "/audit-logs/**",
-                                "/statements/**"
-                        ).permitAll()
+                                "/statements/**",
+                                "/retry/**",
+                                "/exchange/**"
+                        )
+                        .authenticated()
 
 
-                        .anyRequest().authenticated()
+                        // Everything else requires authentication
+                        .anyRequest()
+                        .authenticated()
                 )
 
                 .httpBasic(Customizer.withDefaults());

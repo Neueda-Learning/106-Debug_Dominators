@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,12 +21,18 @@ import {
   api,
   formatAmount,
   formatDateTime,
+  getToken,
   isRefundable,
   type RefundMethod,
 } from "@/lib/api";
 import { AlertTriangle, ArrowLeft, Download } from "lucide-react";
 
 export const Route = createFileRoute("/payments/details")({
+  beforeLoad: () => {
+    if (!getToken()) {
+      throw redirect({ to: "/login" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Payment Detail & Status History — Payments Console" },

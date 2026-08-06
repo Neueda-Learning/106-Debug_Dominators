@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
@@ -27,6 +27,7 @@ import {
   api,
   formatAmount,
   formatDateTime,
+  getToken,
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
@@ -34,6 +35,11 @@ import {
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (!getToken()) {
+      throw redirect({ to: "/login" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "FasterPay — Send Money & Track Every Payment" },
