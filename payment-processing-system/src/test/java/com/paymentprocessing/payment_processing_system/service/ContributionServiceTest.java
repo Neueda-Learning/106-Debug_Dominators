@@ -4,7 +4,9 @@ import com.paymentprocessing.payment_processing_system.dto.ContributionRequest;
 import com.paymentprocessing.payment_processing_system.dto.ContributionResponse;
 import com.paymentprocessing.payment_processing_system.enums.ContributionStatus;
 import com.paymentprocessing.payment_processing_system.exception.ContributionException;
+import com.paymentprocessing.payment_processing_system.model.Campaign;
 import com.paymentprocessing.payment_processing_system.model.Contribution;
+import com.paymentprocessing.payment_processing_system.repository.CampaignRepository;
 import com.paymentprocessing.payment_processing_system.repository.ContributionRepository;
 import com.paymentprocessing.payment_processing_system.service.impl.ContributionServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -31,12 +33,20 @@ class ContributionServiceTest {
     @Mock
     private ContributionRepository contributionRepository;
 
+    @Mock
+    private CampaignRepository campaignRepository;
+
     @InjectMocks
     private ContributionServiceImpl contributionService;
 
     @Test
     void createContribution_shouldCreateContributionAndSaveToRepository() {
         ContributionRequest request = buildContributionRequest();
+
+        Campaign campaign = new Campaign();
+        campaign.setCampaignId(request.getCampaignId());
+        campaign.setCollectedAmount(BigDecimal.ZERO);
+        when(campaignRepository.findById(request.getCampaignId())).thenReturn(Optional.of(campaign));
 
         when(contributionRepository.save(any(Contribution.class))).thenAnswer(invocation -> {
             Contribution contribution = invocation.getArgument(0);

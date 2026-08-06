@@ -7,6 +7,7 @@ import com.paymentprocessing.payment_processing_system.enums.PaymentMethod;
 import com.paymentprocessing.payment_processing_system.enums.PaymentStatus;
 import com.paymentprocessing.payment_processing_system.exception.PaymentNotFoundException;
 import com.paymentprocessing.payment_processing_system.model.Payment;
+import com.paymentprocessing.payment_processing_system.repository.PaymentHistoryRepository;
 import com.paymentprocessing.payment_processing_system.repository.PaymentRepository;
 import com.paymentprocessing.payment_processing_system.service.impl.PaymentServiceImpl;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,9 @@ class PaymentServiceTest {
 
     @Mock
     private PaymentRepository paymentRepository;
+
+    @Mock
+    private PaymentHistoryRepository paymentHistoryRepository;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
