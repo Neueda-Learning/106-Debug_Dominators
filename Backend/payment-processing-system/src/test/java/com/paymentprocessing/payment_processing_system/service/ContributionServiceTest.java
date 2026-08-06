@@ -3,9 +3,11 @@ package com.paymentprocessing.payment_processing_system.service;
 import com.paymentprocessing.payment_processing_system.dto.ContributionRequest;
 import com.paymentprocessing.payment_processing_system.dto.ContributionResponse;
 import com.paymentprocessing.payment_processing_system.enums.ContributionStatus;
+import com.paymentprocessing.payment_processing_system.repository.CampaignRepository;
 import com.paymentprocessing.payment_processing_system.exception.ContributionException;
 import com.paymentprocessing.payment_processing_system.model.Contribution;
 import com.paymentprocessing.payment_processing_system.repository.ContributionRepository;
+import com.paymentprocessing.payment_processing_system.repository.PaymentRepository;
 import com.paymentprocessing.payment_processing_system.service.impl.ContributionServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,12 +33,20 @@ class ContributionServiceTest {
     @Mock
     private ContributionRepository contributionRepository;
 
+    @Mock
+    private PaymentRepository paymentRepository;
+
+    @Mock
+    private CampaignRepository campaignRepository;
+
     @InjectMocks
     private ContributionServiceImpl contributionService;
 
     @Test
     void createContribution_shouldCreateContributionAndSaveToRepository() {
         ContributionRequest request = buildContributionRequest();
+
+        when(paymentRepository.findById(request.getPaymentId())).thenReturn(Optional.empty());
 
         when(contributionRepository.save(any(Contribution.class))).thenAnswer(invocation -> {
             Contribution contribution = invocation.getArgument(0);
@@ -133,6 +143,7 @@ class ContributionServiceTest {
     @Test
     void createContribution_whenRepositorySaveFails_shouldPropagateException() {
         ContributionRequest request = buildContributionRequest();
+        when(paymentRepository.findById(request.getPaymentId())).thenReturn(Optional.empty());
         when(contributionRepository.save(any(Contribution.class)))
                 .thenThrow(new RuntimeException("Database error"));
 

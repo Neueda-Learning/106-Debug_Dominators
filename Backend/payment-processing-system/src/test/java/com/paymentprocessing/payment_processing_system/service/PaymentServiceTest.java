@@ -8,6 +8,7 @@ import com.paymentprocessing.payment_processing_system.enums.PaymentStatus;
 import com.paymentprocessing.payment_processing_system.exception.PaymentNotFoundException;
 import com.paymentprocessing.payment_processing_system.model.Payment;
 import com.paymentprocessing.payment_processing_system.repository.PaymentRepository;
+import com.paymentprocessing.payment_processing_system.service.PaymentHistoryService;
 import com.paymentprocessing.payment_processing_system.service.impl.PaymentServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,9 @@ class PaymentServiceTest {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private PaymentHistoryService paymentHistoryService;
+
     @InjectMocks
     private PaymentServiceImpl paymentService;
 
@@ -42,16 +47,18 @@ class PaymentServiceTest {
 
         when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> {
             Payment payment = invocation.getArgument(0);
-            payment.setId(1L);
+            if (payment.getId() == null) {
+                payment.setId(1L);
+            }
             return payment;
         });
 
         PaymentResponse response = paymentService.createPayment(request);
 
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
-        verify(paymentRepository).save(paymentCaptor.capture());
+        verify(paymentRepository, atLeastOnce()).save(paymentCaptor.capture());
 
-        Payment savedEntity = paymentCaptor.getValue();
+        Payment savedEntity = paymentCaptor.getAllValues().get(0);
         assertThat(savedEntity.getPaymentId()).isNotBlank();
         assertThat(savedEntity.getReferenceNumber()).isNotBlank();
         assertThat(savedEntity.getIdempotencyKey()).isNotBlank();
@@ -64,7 +71,7 @@ class PaymentServiceTest {
         assertThat(savedEntity.getDestinationCountry()).isEqualTo(request.getDestinationCountry());
         assertThat(savedEntity.getDescription()).isEqualTo(request.getDescription());
         assertThat(savedEntity.getRetryCount()).isZero();
-        assertThat(savedEntity.getStatus()).isEqualTo(PaymentStatus.CREATED);
+        assertThat(savedEntity.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
         assertThat(savedEntity.getCreatedAt()).isNotNull();
         assertThat(savedEntity.getUpdatedAt()).isNotNull();
 
@@ -76,7 +83,7 @@ class PaymentServiceTest {
         assertThat(response.getAmount()).isEqualByComparingTo(request.getAmount());
         assertThat(response.getCurrency()).isEqualTo(request.getCurrency());
         assertThat(response.getPaymentMethod()).isEqualTo(request.getPaymentMethod());
-        assertThat(response.getStatus()).isEqualTo(PaymentStatus.CREATED);
+        assertThat(response.getStatus()).isEqualTo(PaymentStatus.COMPLETED);
     }
 
     @Test
