@@ -88,6 +88,42 @@
   --chart-5: oklch(0.68 0.19 22);
 }
 
+:root.light {
+  --background: oklch(0.985 0.006 250);
+  --foreground: oklch(0.24 0.024 250);
+  --surface: oklch(1 0 0);
+  --surface-foreground: oklch(0.24 0.024 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.024 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.024 250);
+  --primary: oklch(0.58 0.12 202);
+  --primary-foreground: oklch(0.99 0.004 250);
+  --secondary: oklch(0.95 0.012 250);
+  --secondary-foreground: oklch(0.3 0.024 250);
+  --muted: oklch(0.96 0.01 250);
+  --muted-foreground: oklch(0.53 0.018 250);
+  --accent: oklch(0.94 0.018 195);
+  --accent-foreground: oklch(0.28 0.024 250);
+  --destructive: oklch(0.62 0.2 22);
+  --destructive-foreground: oklch(0.99 0.004 250);
+  --border: oklch(0.88 0.012 250);
+  --input: oklch(0.88 0.012 250);
+  --ring: oklch(0.58 0.12 202);
+  --status-created: oklch(0.66 0.04 250);
+  --status-validated: oklch(0.62 0.11 215);
+  --status-sent: oklch(0.72 0.13 95);
+  --status-completed: oklch(0.67 0.15 155);
+  --status-failed: oklch(0.61 0.2 22);
+  --chart-1: oklch(0.58 0.12 202);
+  --chart-2: oklch(0.62 0.11 215);
+  --chart-3: oklch(0.72 0.13 95);
+  --chart-4: oklch(0.67 0.15 155);
+  --chart-5: oklch(0.61 0.2 22);
+  --shadow-panel: 0 1px 0 0 oklch(1 0 0 / 92%) inset, 0 18px 40px -24px oklch(0.37 0.03 250 / 18%);
+  --shadow-glow: 0 0 0 1px oklch(0.58 0.12 202 / 18%), 0 12px 32px -12px oklch(0.58 0.12 202 / 18%);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -102,6 +138,12 @@
       radial-gradient(circle at 90% 0%, oklch(0.78 0.13 215 / 10%), transparent 40%);
     background-attachment: fixed;
   }
+}
+
+.light body {
+  background-image:
+    radial-gradient(circle at 12% -10%, oklch(0.58 0.12 202 / 11%), transparent 45%),
+    radial-gradient(circle at 90% 0%, oklch(0.72 0.13 95 / 10%), transparent 40%);
 }
 
 @utility panel {

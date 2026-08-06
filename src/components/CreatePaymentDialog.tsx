@@ -28,14 +28,19 @@ import {
 import {
   CRYPTO_CURRENCIES,
   FIAT_CURRENCIES,
+  LIVE_CRYPTO_CURRENCIES,
+  LIVE_FIAT_CURRENCIES,
   PAYMENT_OPTIONS,
   TAX_RATES,
   api,
   convertAmount,
   feeRateFor,
+  formatAmount,
   getAuthUser,
+  getDefaultCountryForCurrency,
   isCryptoCurrency,
-  round2,
+  isDemoMode,
+  roundAmount,
   type PaymentOptionId,
   type CreatePaymentRequest,
   type Payment,
@@ -64,10 +69,12 @@ export function CreatePaymentDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const [payerAccountId, setPayerAccountId] = useState<number | null>(CURRENT_USER.accountId);
   const [optionId, setOptionId] = useState<PaymentOptionId>("BANK_NATIONAL");
-  const [sourceAccount, setSourceAccount] = useState("HDFC1023");
-  const [destinationAccount, setDestinationAccount] = useState("ICICI2024");
+  const [sourceAccount, setSourceAccount] = useState("");
+  const [destinationAccount, setDestinationAccount] = useState("");
+  const [sourceCountry, setSourceCountry] = useState("US");
+  const [destinationCountry, setDestinationCountry] = useState("US");
+  const [payerAccountId, setPayerAccountId] = useState<number | null>(null);
 
   const [amount, setAmount] = useState(100);
   const [sourceCurrencyCode, setSourceCurrencyCode] = useState("USD");
@@ -115,6 +122,9 @@ export function CreatePaymentDialog({
 
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
+  const liveMode = !isDemoMode();
+  const fiatCurrencies = liveMode ? LIVE_FIAT_CURRENCIES : FIAT_CURRENCIES;
+  const cryptoCurrencies = liveMode ? LIVE_CRYPTO_CURRENCIES : CRYPTO_CURRENCIES;
   const cryptoMode = option.paymentMethod === "CRYPTO";
   const bankMode_ = option.paymentMethod === "NET_BANKING";
   const cardMode = option.paymentMethod === "CREDIT_CARD";
@@ -122,16 +132,21 @@ export function CreatePaymentDialog({
   const settlementIsCrypto = isCryptoCurrency(settlementCurrencyCode);
   const cryptoNeedsBank = cryptoMode && !settlementIsCrypto;
   const needsBankDetails = bankMode_ || cryptoNeedsBank;
+  const hideCountryFields = isCryptoCurrency(sourceCurrencyCode) || settlementIsCrypto;
 
   const feeRate = feeRateFor(amount, sourceCurrencyCode);
   const taxRate = TAX_RATES[sourceCurrencyCode] ?? 0;
 
   const { feeAmount, taxAmount, total } = useMemo(() => {
     const base = Math.max(0, Number(amount) || 0);
-    const fee = round2((base * feeRate) / 100);
-    const tax = round2((base * taxRate) / 100);
-    return { feeAmount: fee, taxAmount: tax, total: round2(base + fee + tax) };
-  }, [amount, feeRate, taxRate]);
+    const fee = roundAmount((base * feeRate) / 100, sourceCurrencyCode);
+    const tax = roundAmount((base * taxRate) / 100, sourceCurrencyCode);
+    return {
+      feeAmount: fee,
+      taxAmount: tax,
+      total: roundAmount(base + fee + tax, sourceCurrencyCode),
+    };
+  }, [amount, feeRate, sourceCurrencyCode, taxRate]);
 
   const settlementAmount = useMemo(
     () => convertAmount(amount, sourceCurrencyCode, settlementCurrencyCode),
@@ -154,13 +169,36 @@ export function CreatePaymentDialog({
     return `upi://pay?${params.toString()}`;
   }, [upiId, total, sourceCurrencyCode, description]);
 
+  useEffect(() => {
+    if (isCryptoCurrency(sourceCurrencyCode)) {
+      setSourceCountry("");
+      return;
+    }
+    setSourceCountry(getDefaultCountryForCurrency(sourceCurrencyCode));
+  }, [sourceCurrencyCode]);
+
+  useEffect(() => {
+    if (settlementIsCrypto) {
+      setDestinationCountry("");
+      return;
+    }
+    setDestinationCountry(getDefaultCountryForCurrency(settlementCurrencyCode));
+  }, [settlementCurrencyCode, settlementIsCrypto]);
+
   const onOptionChange = (id: PaymentOptionId) => {
     setOptionId(id);
     const next = PAYMENT_OPTIONS.find((o) => o.id === id)!;
     const nextCrypto = next.paymentMethod === "CRYPTO";
     setBankMode(id === "BANK_INTERNATIONAL" ? "SWIFT" : "NEFT");
     setSourceCurrencyCode((cur) => {
-      const isCryptoCur = (CRYPTO_CURRENCIES as readonly string[]).includes(cur);
+      const isCryptoCur = (cryptoCurrencies as readonly string[]).includes(cur);
+      if (nextCrypto && !isCryptoCur) return "BTC";
+      if (!nextCrypto && isCryptoCur) return "USD";
+      if (id === "UPI") return "INR";
+      return cur;
+    });
+    setSettlementCurrencyCode((cur) => {
+      const isCryptoCur = (cryptoCurrencies as readonly string[]).includes(cur);
       if (nextCrypto && !isCryptoCur) return "BTC";
       if (!nextCrypto && isCryptoCur) return "USD";
       if (id === "UPI") return "INR";
@@ -172,7 +210,7 @@ export function CreatePaymentDialog({
     `A/C ${bankAccountNumber.trim()} · IFSC ${ifscCode.trim().toUpperCase()}`;
 
   const methodDetail = () => {
-    const to = `To ${destinationAccount.trim() || "destination"}`;
+    const to = `To ${destinationAccount.trim() || "destination account"}`;
     if (bankMode_) return `${to} · Bank transfer mode: ${bankMode} · ${bankDetail()}`;
     if (cardMode) return `${to} · Card •••${cardLast3} exp ${cardExpiry}`;
     if (upiMode) return `${to} · UPI: ${upiId.trim() || "fasterpay@upi"}`;
@@ -200,6 +238,8 @@ export function CreatePaymentDialog({
         settlementCurrencyCode,
         sourceAccount: sourceAccount.trim(),
         destinationAccount: destinationAccount.trim(),
+        sourceCountry: hideCountryFields ? undefined : sourceCountry,
+        destinationCountry: hideCountryFields ? undefined : destinationCountry,
         description: [description.trim(), detail].filter(Boolean).join(" — "),
         feeAmount,
         taxAmount,
@@ -208,7 +248,7 @@ export function CreatePaymentDialog({
     },
     onSuccess: (payment) => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
-      if (upiMode) {
+      if (upiMode && isDemoMode()) {
         setAwaitingPayment(payment);
         return;
       }
@@ -244,7 +284,7 @@ export function CreatePaymentDialog({
                   : "Waiting for payment confirmation…"}
             </DialogTitle>
             <DialogDescription>
-              {awaitingPayment.paymentRef} · {total} {sourceCurrencyCode} to{" "}
+              {awaitingPayment.paymentRef} · {formatAmount(total, sourceCurrencyCode)} to{" "}
               {upiId.trim() || "fasterpay@upi"}
             </DialogDescription>
           </DialogHeader>
@@ -302,19 +342,19 @@ export function CreatePaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="From account / bank ID" hint="sender account label">
+          <Field label="Source account" hint="debited account">
             <Input
               value={sourceAccount}
               onChange={(e) => setSourceAccount(e.target.value)}
-              placeholder="HDFC1023"
+              placeholder="HDFC •••• 4821"
             />
           </Field>
 
-          <Field label="To account / bank ID" hint="receiver account label">
+          <Field label="Destination account" hint="credited account">
             <Input
               value={destinationAccount}
               onChange={(e) => setDestinationAccount(e.target.value)}
-              placeholder="ICICI2024"
+              placeholder="ICICI •••• 1204"
             />
           </Field>
 
@@ -336,7 +376,7 @@ export function CreatePaymentDialog({
             <Input
               type="number"
               min={0}
-              step="0.01"
+              step={isCryptoCurrency(sourceCurrencyCode) ? "0.00000001" : "0.01"}
               value={amount}
               onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
             />
@@ -352,7 +392,7 @@ export function CreatePaymentDialog({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>{cryptoMode ? "Crypto" : "Fiat"}</SelectLabel>
-                  {(cryptoMode ? CRYPTO_CURRENCIES : FIAT_CURRENCIES).map((c) => (
+                  {(cryptoMode ? cryptoCurrencies : fiatCurrencies).map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -369,7 +409,7 @@ export function CreatePaymentDialog({
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Fiat</SelectLabel>
-                  {FIAT_CURRENCIES.map((c) => (
+                  {fiatCurrencies.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -377,7 +417,7 @@ export function CreatePaymentDialog({
                 </SelectGroup>
                 <SelectGroup>
                   <SelectLabel>Crypto</SelectLabel>
-                  {CRYPTO_CURRENCIES.map((c) => (
+                  {cryptoCurrencies.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
@@ -386,6 +426,28 @@ export function CreatePaymentDialog({
               </SelectContent>
             </Select>
           </Field>
+
+          {!hideCountryFields ? (
+            <>
+              <Field label="Source country" hint="auto from source currency">
+                <Input
+                  value={sourceCountry}
+                  onChange={(e) => setSourceCountry(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="US"
+                />
+              </Field>
+
+              <Field label="Destination country" hint="auto from settlement currency">
+                <Input
+                  value={destinationCountry}
+                  onChange={(e) =>
+                    setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))
+                  }
+                  placeholder="IN"
+                />
+              </Field>
+            </>
+          ) : null}
 
           {/* Method-specific details */}
           {bankMode_ ? (
@@ -436,11 +498,11 @@ export function CreatePaymentDialog({
                 <div className="sm:col-span-2 grid gap-1 border-t border-border pt-2">
                   <Row
                     label={`Converted amount (${sourceCurrencyCode} → ${settlementCurrencyCode})`}
-                    value={`${settlementAmount} ${settlementCurrencyCode}`}
+                    value={formatAmount(settlementAmount, settlementCurrencyCode)}
                   />
                   <Row
                     label="Bank credit incl. fee & tax"
-                    value={`${settlementTotal} ${settlementCurrencyCode}`}
+                    value={formatAmount(settlementTotal, settlementCurrencyCode)}
                     strong
                   />
                   <p className="text-xs text-muted-foreground">
@@ -499,7 +561,7 @@ export function CreatePaymentDialog({
                 <p className="text-xs text-muted-foreground">
                   Scan to pay{" "}
                   <span className="font-mono text-foreground">
-                    {total} {sourceCurrencyCode}
+                    {formatAmount(total, sourceCurrencyCode)}
                   </span>{" "}
                   (total charged). The QR updates as the amount changes.
                 </p>
@@ -531,9 +593,9 @@ export function CreatePaymentDialog({
           ) : null}
 
           <div className="sm:col-span-2 grid gap-2 rounded-md border border-border p-3 text-sm">
-            <Row label={`Fee (${feeRate}%)`} value={`${feeAmount} ${sourceCurrencyCode}`} />
-            <Row label={`Tax (${taxRate}%)`} value={`${taxAmount} ${sourceCurrencyCode}`} />
-            <Row label="Total charged" value={`${total} ${sourceCurrencyCode}`} strong />
+            <Row label={`Fee (${feeRate}%)`} value={formatAmount(feeAmount, sourceCurrencyCode)} />
+            <Row label={`Tax (${taxRate}%)`} value={formatAmount(taxAmount, sourceCurrencyCode)} />
+            <Row label="Total charged" value={formatAmount(total, sourceCurrencyCode)} strong />
             <p className="text-xs text-muted-foreground">
               Fee tiers: 0% under $100 equivalent, 0.5% up to $1,000, 0.75% above.
             </p>

@@ -138,9 +138,13 @@ function PaymentDetailPage() {
               </div>
 
               <div className="mt-6 grid gap-x-8 gap-y-4 border-t border-border pt-6 sm:grid-cols-2 lg:grid-cols-3">
+                <Detail label="Payment ID" value={p.paymentRef} mono />
                 <Detail label="Payment type" value={p.paymentType} />
                 <Detail label="Payment method" value={p.paymentMethod} />
                 <Detail label="Idempotency key" value={p.idempotencyKey || "—"} mono />
+                <Detail label="Source currency" value={p.sourceCurrencyCode} />
+                <Detail label="Source country" value={p.sourceCountry ?? "—"} />
+                <Detail label="Destination country" value={p.destinationCountry ?? "—"} />
                 <Detail
                   label="Paid from"
                   value={resolveParty(p.sourceAccount, p.payerAccountId, "—")}
@@ -159,6 +163,8 @@ function PaymentDetailPage() {
                 <Detail label="Initiated" value={formatDateTime(p.initiatedAt)} />
                 <Detail label="Completed" value={formatDateTime(p.completedAt)} />
                 <Detail label="Failed" value={formatDateTime(p.failedAt)} />
+                <Detail label="Created" value={formatDateTime(p.createdAt)} />
+                <Detail label="Updated" value={formatDateTime(p.updatedAt)} />
               </div>
             </div>
 
@@ -201,6 +207,8 @@ function PaymentDetailPage() {
                         )}
                         {h.changedByUserId ? (
                           <p className="mono-tag mt-1">user #{h.changedByUserId}</p>
+                        ) : h.metadata ? (
+                          <p className="mono-tag mt-1">by {h.metadata}</p>
                         ) : null}
                       </li>
                     ))}

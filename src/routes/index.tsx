@@ -174,8 +174,8 @@ function PaymentsPage() {
               <div>
                 <p className="font-medium">Could not reach the payments API</p>
                 <p className="mt-1 text-muted-foreground">
-                  {(query.error as Error).message}. Check the API base URL and sign in via
-                  “Connect API” — protected endpoints require a Bearer token.
+                  {(query.error as Error).message}. Check that the Spring Boot backend is running
+                  and reachable at the configured API base URL.
                 </p>
               </div>
             </div>
@@ -212,7 +212,11 @@ function PaymentsPage() {
 }
 
 function PaymentRow({ payment }: { payment: Payment }) {
-  const resolveParty = (raw: string | null | undefined, id: number | null | undefined, fallback: string) => {
+  const resolveParty = (
+    raw: string | null | undefined,
+    id: number | null | undefined,
+    fallback: string,
+  ) => {
     const direct = raw?.trim();
     if (direct) {
       if (/^\d+$/.test(direct)) {
@@ -224,10 +228,16 @@ function PaymentRow({ payment }: { payment: Payment }) {
     return fallback;
   };
 
-  const payerLabel =
-    resolveParty(payment.sourceAccount, payment.payerAccountId, "Unknown payer");
-  const payeeLabel =
-    resolveParty(payment.destinationAccount, payment.payeeAccountId, "Unknown payee");
+  const payerLabel = resolveParty(
+    payment.sourceAccount,
+    payment.payerAccountId,
+    payment.sourceCountry || "Unknown payer",
+  );
+  const payeeLabel = resolveParty(
+    payment.destinationAccount,
+    payment.payeeAccountId,
+    payment.destinationCountry || "Unknown payee",
+  );
 
   return (
     <TableRow>
