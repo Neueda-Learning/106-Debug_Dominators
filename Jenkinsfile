@@ -38,9 +38,15 @@ pipeline {
 
         stage('Deploy') {
             steps {
+                // Remove old containers by name
                 sh 'docker rm -f mysql_container || true'
                 sh 'docker rm -f springboot_container || true'
                 sh 'docker rm -f frontend_container || true'
+
+                // Remove ANY container using port 8085 (fixes your current error)
+                sh 'docker rm -f $(docker ps -aq --filter "publish=8085") || true'
+
+                // Deploy fresh containers
                 sh 'docker-compose up -d'
             }
         }
