@@ -4,9 +4,14 @@ package com.paymentprocessing.payment_processing_system.service.impl;
 import com.paymentprocessing.payment_processing_system.dto.ContributionRequest;
 import com.paymentprocessing.payment_processing_system.dto.ContributionResponse;
 import com.paymentprocessing.payment_processing_system.enums.ContributionStatus;
+import com.paymentprocessing.payment_processing_system.enums.PaymentStatus;
 import com.paymentprocessing.payment_processing_system.exception.ContributionException;
+import com.paymentprocessing.payment_processing_system.model.Campaign;
 import com.paymentprocessing.payment_processing_system.model.Contribution;
+import com.paymentprocessing.payment_processing_system.model.Payment;
+import com.paymentprocessing.payment_processing_system.repository.CampaignRepository;
 import com.paymentprocessing.payment_processing_system.repository.ContributionRepository;
+import com.paymentprocessing.payment_processing_system.repository.PaymentRepository;
 import com.paymentprocessing.payment_processing_system.service.ContributionService;
 
 import org.slf4j.Logger;
@@ -14,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,12 +37,20 @@ public class ContributionServiceImpl implements ContributionService {
 
     private final ContributionRepository contributionRepository;
 
+    private final PaymentRepository paymentRepository;
+
+    private final CampaignRepository campaignRepository;
+
 
 
     public ContributionServiceImpl(
-            ContributionRepository contributionRepository) {
+            ContributionRepository contributionRepository,
+            PaymentRepository paymentRepository,
+            CampaignRepository campaignRepository) {
 
         this.contributionRepository = contributionRepository;
+        this.paymentRepository = paymentRepository;
+        this.campaignRepository = campaignRepository;
     }
 
 
@@ -92,9 +106,10 @@ public class ContributionServiceImpl implements ContributionService {
         );
 
 
-        contribution.setContributionStatus(
-                ContributionStatus.PENDING
-        );
+        ContributionStatus status =
+                resolveContributionStatus(request.getPaymentId());
+
+        contribution.setContributionStatus(status);
 
 
         contribution.setContributionDate(
@@ -113,6 +128,15 @@ public class ContributionServiceImpl implements ContributionService {
 
 
 
+        if (status == ContributionStatus.SUCCESS) {
+            creditCampaign(
+                    request.getCampaignId(),
+                    request.getContributionAmount()
+            );
+        }
+
+
+
         log.info(
                 "Contribution created successfully with id: {}",
                 savedContribution.getContributionId()
@@ -120,6 +144,62 @@ public class ContributionServiceImpl implements ContributionService {
 
 
         return mapToResponse(savedContribution);
+    }
+
+
+
+
+
+    /**
+     * Mirrors the linked payment's final status onto the contribution so it
+     * doesn't stay stuck as PENDING once the payment has completed or failed.
+     */
+    private ContributionStatus resolveContributionStatus(Long paymentId) {
+
+        if (paymentId == null) {
+            return ContributionStatus.PENDING;
+        }
+
+        return paymentRepository.findById(paymentId)
+                .map(Payment::getStatus)
+                .map(this::mapPaymentStatus)
+                .orElse(ContributionStatus.PENDING);
+    }
+
+
+
+    private ContributionStatus mapPaymentStatus(PaymentStatus paymentStatus) {
+
+        if (paymentStatus == PaymentStatus.COMPLETED) {
+            return ContributionStatus.SUCCESS;
+        }
+
+        if (paymentStatus == PaymentStatus.FAILED) {
+            return ContributionStatus.FAILED;
+        }
+
+        return ContributionStatus.PENDING;
+    }
+
+
+
+    private void creditCampaign(Long campaignId, BigDecimal amount) {
+
+        if (campaignId == null || amount == null) {
+            return;
+        }
+
+        campaignRepository.findById(campaignId).ifPresent(campaign -> {
+
+            BigDecimal current =
+                    campaign.getCollectedAmount() != null
+                            ? campaign.getCollectedAmount()
+                            : BigDecimal.ZERO;
+
+            campaign.setCollectedAmount(current.add(amount));
+
+            campaignRepository.save(campaign);
+        });
     }
 
 

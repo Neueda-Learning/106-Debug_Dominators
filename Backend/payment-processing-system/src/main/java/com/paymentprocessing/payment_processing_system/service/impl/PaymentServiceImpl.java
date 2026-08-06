@@ -1,12 +1,15 @@
 package com.paymentprocessing.payment_processing_system.service.impl;
 
 
+import com.paymentprocessing.payment_processing_system.dto.PaymentHistoryRequest;
 import com.paymentprocessing.payment_processing_system.dto.PaymentRequest;
 import com.paymentprocessing.payment_processing_system.dto.PaymentResponse;
+import com.paymentprocessing.payment_processing_system.enums.ErrorCode;
 import com.paymentprocessing.payment_processing_system.enums.PaymentStatus;
 import com.paymentprocessing.payment_processing_system.exception.PaymentNotFoundException;
 import com.paymentprocessing.payment_processing_system.model.Payment;
 import com.paymentprocessing.payment_processing_system.repository.PaymentRepository;
+import com.paymentprocessing.payment_processing_system.service.PaymentHistoryService;
 import com.paymentprocessing.payment_processing_system.service.PaymentService;
 import com.paymentprocessing.payment_processing_system.util.IdGenerator;
 
@@ -32,12 +35,16 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
 
+    private final PaymentHistoryService paymentHistoryService;
+
 
 
     public PaymentServiceImpl(
-            PaymentRepository paymentRepository) {
+            PaymentRepository paymentRepository,
+            PaymentHistoryService paymentHistoryService) {
 
         this.paymentRepository = paymentRepository;
+        this.paymentHistoryService = paymentHistoryService;
     }
 
 
@@ -72,7 +79,117 @@ public class PaymentServiceImpl implements PaymentService {
         );
 
 
-        return mapToResponse(savedPayment);
+        Payment processedPayment =
+                processPayment(savedPayment);
+
+
+        return mapToResponse(processedPayment);
+    }
+
+
+
+
+
+    /**
+     * Drives a newly created payment through validation and processing so it
+     * reaches a terminal status (COMPLETED/FAILED) instead of staying CREATED
+     * forever. Every transition is recorded in payment history.
+     */
+    private Payment processPayment(Payment payment) {
+
+
+        PaymentStatus previousStatus = payment.getStatus();
+
+
+        payment = transitionStatus(
+                payment,
+                previousStatus,
+                PaymentStatus.VALIDATED,
+                "VALIDATION",
+                "Payment details validated successfully"
+        );
+
+
+        previousStatus = payment.getStatus();
+
+        payment = transitionStatus(
+                payment,
+                previousStatus,
+                PaymentStatus.PROCESSING,
+                "PROCESSING",
+                "Payment sent for processing"
+        );
+
+
+        boolean success =
+                payment.getAmount() != null
+                        && payment.getAmount().signum() > 0;
+
+
+        if (!success) {
+            payment.setErrorCode(ErrorCode.INVALID_AMOUNT);
+            payment.setErrorMessage("Payment amount must be greater than zero");
+        }
+
+
+        previousStatus = payment.getStatus();
+
+        return transitionStatus(
+                payment,
+                previousStatus,
+                success ? PaymentStatus.COMPLETED : PaymentStatus.FAILED,
+                success ? "COMPLETED" : "FAILED",
+                success
+                        ? "Payment completed successfully"
+                        : "Payment processing failed"
+        );
+    }
+
+
+
+
+
+    private Payment transitionStatus(
+            Payment payment,
+            PaymentStatus oldStatus,
+            PaymentStatus newStatus,
+            String eventType,
+            String remarks) {
+
+
+        payment.setStatus(newStatus);
+
+        payment.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+
+        Payment updatedPayment =
+                paymentRepository.save(payment);
+
+
+        PaymentHistoryRequest historyRequest =
+                new PaymentHistoryRequest();
+
+        historyRequest.setPaymentId(updatedPayment.getId());
+        historyRequest.setOldStatus(oldStatus);
+        historyRequest.setNewStatus(newStatus);
+        historyRequest.setEventType(eventType);
+        historyRequest.setRemarks(remarks);
+        historyRequest.setChangedBy("SYSTEM");
+
+        paymentHistoryService.createHistory(historyRequest);
+
+
+        log.info(
+                "Payment id: {} transitioned from {} to {}",
+                updatedPayment.getId(),
+                oldStatus,
+                newStatus
+        );
+
+
+        return updatedPayment;
     }
 
 
