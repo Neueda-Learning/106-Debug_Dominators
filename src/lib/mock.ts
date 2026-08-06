@@ -301,14 +301,18 @@ export const mockApi = {
   async getPayment(id: number | string) {
     const store = load();
     settleDueUpi(store);
-    const payment = store.payments.find((p) => p.paymentId === Number(id));
+    const lookup = String(id).trim();
+    const payment =
+      store.payments.find((p) => p.paymentId === Number(lookup)) ||
+      store.payments.find((p) => p.paymentRef === lookup || p.externalPaymentRef === lookup);
     if (!payment) throw new Error(`Payment ${id} not found`);
     return delay({ ...payment }, 120);
   },
   async getPaymentHistory(id: number | string) {
     const store = load();
     settleDueUpi(store);
-    return delay(store.history.filter((h) => h.paymentId === Number(id)));
+    const payment = await this.getPayment(id);
+    return delay(store.history.filter((h) => h.paymentId === Number(payment.paymentId)));
   },
   async createPayment(data: CreatePaymentRequest) {
     const store = load();
@@ -373,14 +377,16 @@ export const mockApi = {
   },
   async listRefunds(id: number | string) {
     const store = load();
-    return delay(store.refunds.filter((r) => r.paymentId === Number(id)));
+    const payment = await this.getPayment(id);
+    return delay(store.refunds.filter((r) => r.paymentId === Number(payment.paymentId)));
   },
   async requestRefund(
     id: number | string,
     data: { refundReason: string; refundMethod: RefundMethod; remarks?: string | null },
   ) {
     const store = load();
-    const payment = store.payments.find((p) => p.paymentId === Number(id));
+    const resolved = await this.getPayment(id);
+    const payment = store.payments.find((p) => p.paymentId === Number(resolved.paymentId));
     if (!payment) throw new Error(`Payment ${id} not found`);
     if (payment.status !== "FAILED")
       throw new Error("Only failed payments can be refunded");

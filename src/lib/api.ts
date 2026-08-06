@@ -637,6 +637,21 @@ export function getAuthUser(): AuthUser | null {
   }
 }
 
+function isNumericIdentifier(id: number | string) {
+  return typeof id === "number" || /^\d+$/.test(String(id));
+}
+
+async function resolvePaymentLookupId(id: number | string) {
+  if (isNumericIdentifier(id)) return Number(id);
+  const lookup = String(id).trim();
+  const payments = await api.listPayments();
+  const matched = payments.find(
+    (payment) => payment.paymentRef === lookup || payment.externalPaymentRef === lookup,
+  );
+  if (!matched) throw new Error(`Payment ${id} not found`);
+  return matched.paymentId;
+}
+
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
@@ -720,13 +735,25 @@ export const api = {
   getPayment: (id: number | string) =>
     isDemoMode()
       ? mockApi.getPayment(id)
-      : request<SpringPaymentResponse>(`/payments/${id}`).then(mapSpringPayment),
+      : isNumericIdentifier(id)
+        ? request<SpringPaymentResponse>(`/payments/${id}`).then(mapSpringPayment)
+        : api.listPayments().then((rows) => {
+            const lookup = String(id).trim();
+            const matched = rows.find(
+              (payment) =>
+                payment.paymentRef === lookup || payment.externalPaymentRef === lookup,
+            );
+            if (!matched) throw new Error(`Payment ${id} not found`);
+            return matched;
+          }),
   // GET /api/payments/{id}/history
   getPaymentHistory: (id: number | string) =>
     isDemoMode()
       ? mockApi.getPaymentHistory(id)
-      : request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${id}`).then((rows) =>
-          rows.map(mapSpringPaymentHistory),
+      : resolvePaymentLookupId(id).then((resolvedId) =>
+          request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${resolvedId}`).then(
+            (rows) => rows.map(mapSpringPaymentHistory),
+          ),
         ),
   // POST /api/payments
   createPayment: (data: CreatePaymentRequest) =>
@@ -751,10 +778,12 @@ export const api = {
   listRefunds: (id: number | string) =>
     isDemoMode()
       ? mockApi.listRefunds(id)
-      : request<SpringRefundResponse[]>("/refunds").then((rows) =>
-          rows
-            .filter((refund) => String(refund.paymentId) === String(id))
-            .map(mapSpringRefund),
+      : resolvePaymentLookupId(id).then((resolvedId) =>
+          request<SpringRefundResponse[]>("/refunds").then((rows) =>
+            rows
+              .filter((refund) => String(refund.paymentId) === String(resolvedId))
+              .map(mapSpringRefund),
+          ),
         ),
   // POST /api/payments/{id}/refunds
   requestRefund: (
@@ -763,18 +792,18 @@ export const api = {
   ) =>
     isDemoMode()
       ? mockApi.requestRefund(id, data)
-      : api.getPayment(id).then((payment) =>
+      : resolvePaymentLookupId(id).then((resolvedId) => api.getPayment(resolvedId).then((payment) =>
           request<SpringRefundResponse>("/refunds", {
             method: "POST",
             body: JSON.stringify({
-              paymentId: Number(id),
+              paymentId: Number(resolvedId),
               refundAmount: Number(payment.netAmount ?? payment.amount),
               refundMethod: data.refundMethod,
               refundReason: data.refundReason,
               initiatedBy: "CUSTOMER",
             }),
           }).then(mapSpringRefund),
-        ),
+        )),
   listCampaigns: () =>
     isDemoMode()
       ? mockApi.listCampaigns()
