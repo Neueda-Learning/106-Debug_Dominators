@@ -1,33 +1,20 @@
-# Stage 1: Build React Application
-FROM node:22-alpine AS builder
+# ---------- Build Stage ----------
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY pom.xml .
+COPY src ./src
 
-# Install dependencies
-RUN npm ci
+RUN mvn clean package -DskipTests
 
-# Copy source code
-COPY . .
+# ----------- Runtime Stage ----------
+FROM eclipse-temurin:21-jre
 
-# Build React application
-RUN npm run build
+WORKDIR /app
 
+COPY --from=builder /app/target/*.jar app.jar
 
-# Stage 2: Nginx
-FROM nginx:alpine
+EXPOSE 8082
 
-# Remove default website
-RUN rm -rf /usr/share/nginx/html/*
-
-# Copy React build output
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Optional custom nginx configuration
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["java","-jar","app.jar"]
