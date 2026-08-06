@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 
 
@@ -63,6 +66,11 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment savedPayment =
                 paymentRepository.save(payment);
+
+
+        triggerStatusProgression(
+                savedPayment.getId()
+        );
 
 
 
@@ -360,6 +368,122 @@ public class PaymentServiceImpl implements PaymentService {
 
 
         return payment;
+    }
+
+
+
+
+    private void triggerStatusProgression(Long paymentId) {
+
+
+        CompletableFuture.runAsync(() -> {
+
+
+            try {
+                advanceStatus(
+                        paymentId,
+                        PaymentStatus.VALIDATED,
+                        2
+                );
+
+
+                advanceStatus(
+                        paymentId,
+                        PaymentStatus.PROCESSING,
+                        2
+                );
+
+
+                PaymentStatus finalStatus =
+                        ThreadLocalRandom.current().nextInt(100) < 85
+                                ? PaymentStatus.COMPLETED
+                                : PaymentStatus.FAILED;
+
+
+                advanceStatus(
+                        paymentId,
+                        finalStatus,
+                        2
+                );
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                log.warn(
+                        "Payment lifecycle progression interrupted for id: {}",
+                        paymentId
+                );
+            } catch (Exception ex) {
+                log.error(
+                        "Unable to progress payment lifecycle for id: {}",
+                        paymentId,
+                        ex
+                );
+            }
+        });
+    }
+
+
+
+
+    private void advanceStatus(
+            Long paymentId,
+            PaymentStatus nextStatus,
+            long delaySeconds) throws InterruptedException {
+
+
+        TimeUnit.SECONDS.sleep(
+                delaySeconds
+        );
+
+
+        Payment payment =
+                paymentRepository.findById(paymentId)
+                        .orElse(null);
+
+
+        if (payment == null) {
+            log.warn(
+                    "Payment not found while advancing lifecycle. id: {}",
+                    paymentId
+            );
+            return;
+        }
+
+
+        if (payment.getStatus() == PaymentStatus.COMPLETED
+                || payment.getStatus() == PaymentStatus.FAILED
+                || payment.getStatus() == PaymentStatus.CANCELLED
+                || payment.getStatus() == PaymentStatus.REFUNDED) {
+            return;
+        }
+
+
+        payment.setStatus(
+                nextStatus
+        );
+
+
+        payment.setUpdatedAt(
+                LocalDateTime.now()
+        );
+
+
+        if (nextStatus == PaymentStatus.FAILED) {
+            payment.setErrorMessage(
+                    "Payment processing failed during simulated settlement."
+            );
+        }
+
+
+        paymentRepository.save(
+                payment
+        );
+
+
+        log.info(
+                "Payment id {} moved to status {}",
+                paymentId,
+                nextStatus
+        );
     }
 
 
