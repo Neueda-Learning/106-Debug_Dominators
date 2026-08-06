@@ -37,9 +37,11 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                sh 'docker-compose up -d'
-            }
+    steps {
+        sh 'docker rm -f mysql_container || true'
+        sh 'docker-compose up -d'
+    }
+}
         }
 
         stage('Verify') {
