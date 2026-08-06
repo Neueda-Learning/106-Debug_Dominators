@@ -402,7 +402,9 @@ type SpringContributionResponse = {
 const BASE_KEY = "pp.apiBaseUrl";
 const TOKEN_KEY = "pp.jwt";
 const LIVE_PAYMENT_METADATA_KEY = "pp.livePaymentMetadata";
-export const DEFAULT_BASE_URL = "http://localhost:8082";
+const ENV_DEFAULT_BASE_URL =
+  typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_BASE_URL : undefined;
+export const DEFAULT_BASE_URL = ENV_DEFAULT_BASE_URL || "http://localhost:8082";
 
 export function getApiBaseUrl() {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
@@ -749,6 +751,14 @@ export const api = {
     } catch (error) {
       setToken(null);
       setAuthUser(null);
+      if (
+        error instanceof TypeError &&
+        /failed to fetch|networkerror|load failed/i.test(error.message)
+      ) {
+        throw new Error(
+          `Cannot reach backend at ${getApiBaseUrl()}. Ensure backend is running and CORS allows the frontend origin.`,
+        );
+      }
       throw error;
     }
   },
