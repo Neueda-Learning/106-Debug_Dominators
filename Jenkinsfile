@@ -163,8 +163,15 @@ APP_CORS_ALLOWED_ORIGINS=${env.APP_CORS_ALLOWED_ORIGINS ?: "http://localhost:${e
                     def workDir = readFile(env.WORK_DIR_FILE).trim()
                     def composeCmd = readFile(env.COMPOSE_CMD_FILE).trim()
                     dir(workDir) {
+                        sh "${composeCmd} --env-file .env down --volumes --remove-orphans || true"
                         sh "${composeCmd} --env-file .env pull || true"
-                        sh "${composeCmd} --env-file .env up -d --build --remove-orphans"
+                        sh """
+if ! ${composeCmd} --env-file .env up -d --build --remove-orphans; then
+  ${composeCmd} --env-file .env ps || true
+  ${composeCmd} --env-file .env logs --tail=200 backend mysql frontend || true
+  exit 1
+fi
+"""
                         sh "${composeCmd} --env-file .env ps"
                     }
                 }
