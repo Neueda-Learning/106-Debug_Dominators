@@ -26,8 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  CRYPTO_CURRENCIES,
-  FIAT_CURRENCIES,
   LIVE_CRYPTO_CURRENCIES,
   LIVE_FIAT_CURRENCIES,
   PAYMENT_OPTIONS,
@@ -39,13 +37,11 @@ import {
   getAuthUser,
   getDefaultCountryForCurrency,
   isCryptoCurrency,
-  isDemoMode,
   roundAmount,
   type PaymentOptionId,
   type CreatePaymentRequest,
   type Payment,
 } from "@/lib/api";
-import { CURRENT_USER } from "@/lib/mock";
 
 
 
@@ -94,7 +90,7 @@ export function CreatePaymentDialog({
   const [awaitingPayment, setAwaitingPayment] = useState<Payment | null>(null);
 
   useEffect(() => {
-    const me = getAuthUser()?.userId ?? CURRENT_USER.accountId;
+    const me = getAuthUser()?.userId ?? 0;
     setPayerAccountId(me);
     if (open) setAwaitingPayment(null);
   }, [open]);
@@ -122,9 +118,8 @@ export function CreatePaymentDialog({
 
 
   const option = PAYMENT_OPTIONS.find((o) => o.id === optionId)!;
-  const liveMode = !isDemoMode();
-  const fiatCurrencies = liveMode ? LIVE_FIAT_CURRENCIES : FIAT_CURRENCIES;
-  const cryptoCurrencies = liveMode ? LIVE_CRYPTO_CURRENCIES : CRYPTO_CURRENCIES;
+  const fiatCurrencies = LIVE_FIAT_CURRENCIES;
+  const cryptoCurrencies = LIVE_CRYPTO_CURRENCIES;
   const cryptoMode = option.paymentMethod === "CRYPTO";
   const bankMode_ = option.paymentMethod === "NET_BANKING";
   const cardMode = option.paymentMethod === "CREDIT_CARD";
@@ -248,10 +243,6 @@ export function CreatePaymentDialog({
     },
     onSuccess: (payment) => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
-      if (upiMode && isDemoMode()) {
-        setAwaitingPayment(payment);
-        return;
-      }
       toast.success(`Payment ${payment.paymentRef} created (${payment.status})`);
       onOpenChange(false);
     },

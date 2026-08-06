@@ -24,7 +24,6 @@ import {
   isRefundable,
   type RefundMethod,
 } from "@/lib/api";
-import { accountName } from "@/lib/mock";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/payments/$paymentId")({
@@ -88,16 +87,10 @@ function PaymentDetailPage() {
 
   const resolveParty = (
     rawAccount: string | null | undefined,
-    id: number | null | undefined,
     fallback: string,
   ) => {
     const raw = rawAccount?.trim();
-    if (raw) {
-      if (/^\d+$/.test(raw)) return accountName(Number(raw));
-      return raw;
-    }
-    if (id && id > 0) return accountName(id);
-    return fallback;
+    return raw || fallback;
   };
 
   return (
@@ -147,11 +140,11 @@ function PaymentDetailPage() {
                 <Detail label="Destination country" value={p.destinationCountry ?? "—"} />
                 <Detail
                   label="Paid from"
-                  value={resolveParty(p.sourceAccount, p.payerAccountId, "—")}
+                  value={resolveParty(p.sourceAccount, p.sourceCountry || "—")}
                 />
                 <Detail
                   label="Paid to"
-                  value={resolveParty(p.destinationAccount, p.payeeAccountId, "—")}
+                  value={resolveParty(p.destinationAccount, p.destinationCountry || "—")}
                 />
                 <Detail label="Campaign" value={p.campaignId ?? "—"} />
                 <Detail label="Fee" value={formatAmount(p.feeAmount, p.sourceCurrencyCode)} />

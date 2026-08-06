@@ -30,7 +30,6 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
-import { accountName } from "@/lib/mock";
 
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
@@ -212,32 +211,9 @@ function PaymentsPage() {
 }
 
 function PaymentRow({ payment }: { payment: Payment }) {
-  const resolveParty = (
-    raw: string | null | undefined,
-    id: number | null | undefined,
-    fallback: string,
-  ) => {
-    const direct = raw?.trim();
-    if (direct) {
-      if (/^\d+$/.test(direct)) {
-        return accountName(Number(direct));
-      }
-      return direct;
-    }
-    if (id && id > 0) return accountName(id);
-    return fallback;
-  };
-
-  const payerLabel = resolveParty(
-    payment.sourceAccount,
-    payment.payerAccountId,
-    payment.sourceCountry || "Unknown payer",
-  );
-  const payeeLabel = resolveParty(
-    payment.destinationAccount,
-    payment.payeeAccountId,
-    payment.destinationCountry || "Unknown payee",
-  );
+  const payerLabel = payment.sourceAccount?.trim() || payment.sourceCountry || "Unknown payer";
+  const payeeLabel =
+    payment.destinationAccount?.trim() || payment.destinationCountry || "Unknown payee";
 
   return (
     <TableRow>

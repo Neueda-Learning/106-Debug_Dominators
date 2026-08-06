@@ -1,5 +1,3 @@
-import { mockApi } from "./mock";
-
 // Typed client for the Spring Boot Payment Processing API (see selfproject backend).
 
 // Base URL and JWT are stored in localStorage so the page can point at any
@@ -696,135 +694,99 @@ function safeJson(text: string) {
   }
 }
 
-const DEMO_KEY = "pp.demoMode";
-/** Demo mode serves data from the in-browser demo store (no backend required). */
-export function isDemoMode() {
-  return false;
-}
-export function setDemoMode(on: boolean) {
-  localStorage.setItem(DEMO_KEY, on ? "on" : "off");
-}
-
 export const api = {
 
   // POST /api/auth/login
   login: (email: string, password: string) =>
-    isDemoMode()
-      ? mockApi.login(email)
-      : Promise.reject(
-          new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
-        ),
+    Promise.reject(
+      new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
+    ),
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
-    isDemoMode()
-      ? mockApi.login(data.email)
-      : Promise.reject(
-          new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
-        ),
+    Promise.reject(
+      new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
+    ),
   // GET /api/payments
   listPayments: () =>
-    isDemoMode()
-      ? mockApi.listPayments()
-      : request<SpringPaymentResponse[]>("/payments").then((rows) => rows.map(mapSpringPayment)),
+    request<SpringPaymentResponse[]>("/payments").then((rows) => rows.map(mapSpringPayment)),
   // GET /api/payments/status/{status}
   listPaymentsByStatus: (status: PaymentStatus) =>
-    isDemoMode()
-      ? mockApi.listPaymentsByStatus(status)
-      : api.listPayments().then((rows) => rows.filter((payment) => payment.status === status)),
+    api.listPayments().then((rows) => rows.filter((payment) => payment.status === status)),
   // GET /api/payments/{id}
   getPayment: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.getPayment(id)
-      : isNumericIdentifier(id)
-        ? request<SpringPaymentResponse>(`/payments/${id}`).then(mapSpringPayment)
-        : api.listPayments().then((rows) => {
-            const lookup = String(id).trim();
-            const matched = rows.find(
-              (payment) =>
-                payment.paymentRef === lookup || payment.externalPaymentRef === lookup,
-            );
-            if (!matched) throw new Error(`Payment ${id} not found`);
-            return matched;
-          }),
+    isNumericIdentifier(id)
+      ? request<SpringPaymentResponse>(`/payments/${id}`).then(mapSpringPayment)
+      : api.listPayments().then((rows) => {
+          const lookup = String(id).trim();
+          const matched = rows.find(
+            (payment) => payment.paymentRef === lookup || payment.externalPaymentRef === lookup,
+          );
+          if (!matched) throw new Error(`Payment ${id} not found`);
+          return matched;
+        }),
   // GET /api/payments/{id}/history
   getPaymentHistory: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.getPaymentHistory(id)
-      : resolvePaymentLookupId(id).then((resolvedId) =>
-          request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${resolvedId}`).then(
-            (rows) => rows.map(mapSpringPaymentHistory),
-          ),
-        ),
+    resolvePaymentLookupId(id).then((resolvedId) =>
+      request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${resolvedId}`).then(
+        (rows) => rows.map(mapSpringPaymentHistory),
+      ),
+    ),
   // POST /api/payments
   createPayment: (data: CreatePaymentRequest) =>
-    isDemoMode()
-      ? mockApi.createPayment(data)
-      : request<SpringPaymentResponse>("/payments", {
-          method: "POST",
-          body: JSON.stringify(mapCreatePaymentRequest(data)),
-        }).then((payment) => {
-          saveLivePaymentMetadata(payment.id, data);
-          return mapSpringPayment(payment);
-        }),
+    request<SpringPaymentResponse>("/payments", {
+      method: "POST",
+      body: JSON.stringify(mapCreatePaymentRequest(data)),
+    }).then((payment) => {
+      saveLivePaymentMetadata(payment.id, data);
+      return mapSpringPayment(payment);
+    }),
   // PUT /api/payments/{id}/status
   updatePaymentStatus: (
     id: number | string,
     data: { status: PaymentStatus; reasonCode?: string | undefined; reasonMessage?: string | undefined },
   ) =>
-    isDemoMode()
-      ? mockApi.updatePaymentStatus(id, data)
-      : Promise.reject(new Error("Payment status updates are not exposed by this backend.")),
+    Promise.reject(new Error("Payment status updates are not exposed by this backend.")),
   // GET /api/payments/{id}/refunds
   listRefunds: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.listRefunds(id)
-      : resolvePaymentLookupId(id).then((resolvedId) =>
-          request<SpringRefundResponse[]>("/refunds").then((rows) =>
-            rows
-              .filter((refund) => String(refund.paymentId) === String(resolvedId))
-              .map(mapSpringRefund),
-          ),
-        ),
+    resolvePaymentLookupId(id).then((resolvedId) =>
+      request<SpringRefundResponse[]>("/refunds").then((rows) =>
+        rows
+          .filter((refund) => String(refund.paymentId) === String(resolvedId))
+          .map(mapSpringRefund),
+      ),
+    ),
   // POST /api/payments/{id}/refunds
   requestRefund: (
     id: number | string,
     data: { refundReason: string; refundMethod: RefundMethod; remarks?: string | null },
   ) =>
-    isDemoMode()
-      ? mockApi.requestRefund(id, data)
-      : resolvePaymentLookupId(id).then((resolvedId) => api.getPayment(resolvedId).then((payment) =>
-          request<SpringRefundResponse>("/refunds", {
-            method: "POST",
-            body: JSON.stringify({
-              paymentId: Number(resolvedId),
-              refundAmount: Number(payment.netAmount ?? payment.amount),
-              refundMethod: data.refundMethod,
-              refundReason: data.refundReason,
-              initiatedBy: "CUSTOMER",
-            }),
-          }).then(mapSpringRefund),
-        )),
+    resolvePaymentLookupId(id).then((resolvedId) =>
+      api.getPayment(resolvedId).then((payment) =>
+        request<SpringRefundResponse>("/refunds", {
+          method: "POST",
+          body: JSON.stringify({
+            paymentId: Number(resolvedId),
+            refundAmount: Number(payment.netAmount ?? payment.amount),
+            refundMethod: data.refundMethod,
+            refundReason: data.refundReason,
+            initiatedBy: "CUSTOMER",
+          }),
+        }).then(mapSpringRefund),
+      ),
+    ),
   listCampaigns: () =>
-    isDemoMode()
-      ? mockApi.listCampaigns()
-      : request<SpringCampaignResponse[]>("/campaigns").then((rows) => rows.map(mapSpringCampaign)),
+    request<SpringCampaignResponse[]>("/campaigns").then((rows) => rows.map(mapSpringCampaign)),
   // GET /api/crowdfunding/campaigns/{id}
   getCampaign: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.getCampaign(id)
-      : request<SpringCampaignResponse>(`/campaigns/${id}`).then(mapSpringCampaign),
+    request<SpringCampaignResponse>(`/campaigns/${id}`).then(mapSpringCampaign),
   // GET /api/crowdfunding/campaigns/{id}/progress
   getCampaignProgress: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.getCampaignProgress(id)
-      : api.getCampaign(id).then(calculateCampaignProgress),
+    api.getCampaign(id).then(calculateCampaignProgress),
   // GET /api/crowdfunding/campaigns/{id}/contributions
   getContributions: (id: number | string) =>
-    isDemoMode()
-      ? mockApi.getContributions(id)
-      : request<SpringContributionResponse[]>(`/contributions/campaign/${id}`).then((rows) =>
-          rows.map(mapSpringContribution),
-        ),
+    request<SpringContributionResponse[]>(`/contributions/campaign/${id}`).then((rows) =>
+      rows.map(mapSpringContribution),
+    ),
   // POST /api/crowdfunding/campaigns/{id}/contributions
   contribute: (
     id: number | string,
@@ -836,26 +798,24 @@ export const api = {
       anonymous?: boolean;
     },
   ) =>
-    isDemoMode()
-      ? mockApi.contribute(id, data)
-      : createLiveContributionPayment(id, data.amount, data.contributorId).then((paymentId) =>
-          request<SpringContributionResponse>("/contributions", {
-            method: "POST",
-            body: JSON.stringify({
-              campaignId: Number(id),
-              paymentId,
-              contributorName: data.anonymous
-                ? "Anonymous"
-                : `Contributor #${data.contributorId ?? "guest"}`,
-              contributorEmail: data.contributorId
-                ? `contributor${data.contributorId}@fasterpay.local`
-                : "guest@fasterpay.local",
-              contributionAmount: data.amount,
-              anonymousDonation: data.anonymous ?? false,
-              message: data.note ?? null,
-            }),
-          }).then(mapSpringContribution),
-        ),
+    createLiveContributionPayment(id, data.amount, data.contributorId).then((paymentId) =>
+      request<SpringContributionResponse>("/contributions", {
+        method: "POST",
+        body: JSON.stringify({
+          campaignId: Number(id),
+          paymentId,
+          contributorName: data.anonymous
+            ? "Anonymous"
+            : `Contributor #${data.contributorId ?? "guest"}`,
+          contributorEmail: data.contributorId
+            ? `contributor${data.contributorId}@fasterpay.local`
+            : "guest@fasterpay.local",
+          contributionAmount: data.amount,
+          anonymousDonation: data.anonymous ?? false,
+          message: data.note ?? null,
+        }),
+      }).then(mapSpringContribution),
+    ),
 };
 
 
