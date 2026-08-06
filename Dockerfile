@@ -26,7 +26,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
 
 # ---------- Frontend Build ----------
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /workspace/Frontend
 
 COPY Frontend/package*.json ./
@@ -40,7 +40,7 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 # ---------- Frontend Runtime ----------
-FROM node:20-alpine AS frontend
+FROM node:22-alpine AS frontend
 WORKDIR /app
 
 RUN apk add --no-cache wget
