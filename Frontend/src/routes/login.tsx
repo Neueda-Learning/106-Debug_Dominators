@@ -28,9 +28,9 @@ function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: () => api.login(username, password),
-    onSuccess: async () => {
+     onSuccess: () => {
       toast.success("Login successful");
-      await navigate({ to: "/" });
+      window.location.href = "/";
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Login failed");
