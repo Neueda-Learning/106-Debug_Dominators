@@ -743,7 +743,7 @@ export const api = {
       throw new Error("Login is only available in the browser.");
     }
     const safeUser = username.trim() || "debug";
-    const safePass = password || "admin";
+    const safePass = password || "n3u3da!";
     const basic = `Basic ${window.btoa(`${safeUser}:${safePass}`)}`;
     setToken(basic);
     setAuthUser({ userId: 1, email: safeUser, role: "USER" });
