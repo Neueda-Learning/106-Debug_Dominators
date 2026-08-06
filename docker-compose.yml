@@ -87,6 +87,25 @@ services:
       retries: 5
       start_period: 60s
 
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-18085}:80"
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - fasterpay-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   mysql_data:
     driver: local

@@ -20,6 +20,7 @@ pipeline {
         MYSQL_PORT = '13306'
         BACKEND_PORT = '18082'
         FRONTEND_PORT = '18081'
+        NGINX_PORT = '18085'
     }
 
     stages {
@@ -148,6 +149,7 @@ MYSQL_PASSWORD=${env.MYSQL_PASSWORD ?: 'n3u3da!'}
 MYSQL_PORT=${env.MYSQL_PORT ?: '13306'}
 BACKEND_PORT=${env.BACKEND_PORT ?: '18082'}
 FRONTEND_PORT=${env.FRONTEND_PORT ?: '18081'}
+NGINX_PORT=${env.NGINX_PORT ?: '18085'}
 VITE_API_BASE_URL=${env.VITE_API_BASE_URL ?: "http://localhost:${env.BACKEND_PORT ?: '18082'}"}
 APP_CORS_ALLOWED_ORIGINS=${env.APP_CORS_ALLOWED_ORIGINS ?: "http://localhost:${env.FRONTEND_PORT ?: '18081'}"}
 """.trim() + "\n"
@@ -197,25 +199,25 @@ ${composeCmd} --env-file .env up -d --build --remove-orphans backend frontend ||
 
 BACKEND_CONTAINER="\${COMPOSE_PROJECT_NAME}-backend-1"
 BACKEND_READY=""
-for i in \$(seq 1 24); do
+for i in \$(seq 1 60); do
     BACKEND_STATUS=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "\${BACKEND_CONTAINER}" 2>/dev/null || true)
-    if [ "\${BACKEND_STATUS}" = "healthy" ] || [ "\${BACKEND_STATUS}" = "running" ]; then
-        echo "Backend container is \${BACKEND_STATUS}."
+    if [ "\${BACKEND_STATUS}" = "healthy" ]; then
+        echo "Backend is healthy."
         BACKEND_READY="yes"
         break
     fi
-    echo "Waiting for backend container to recover (Docker will auto-restart it)... (\${i}/24, status=\${BACKEND_STATUS:-unknown})"
+    echo "Waiting for backend to become healthy (Docker will auto-restart it on crash)... (\${i}/60, status=\${BACKEND_STATUS:-unknown})"
     sleep 5
 done
 
 if [ -z "\${BACKEND_READY}" ]; then
-    echo "Backend container did not recover in time."
+    echo "Backend did not become healthy in time."
     ${composeCmd} --env-file .env ps || true
     ${composeCmd} --env-file .env logs --tail=200 backend mysql || true
     exit 1
 fi
 
-${composeCmd} --env-file .env up -d --build --remove-orphans frontend || true
+${composeCmd} --env-file .env up -d --build --remove-orphans frontend nginx || true
 """
                         sh "${composeCmd} --env-file .env ps"
                     }
@@ -257,6 +259,21 @@ for i in $(seq 1 30); do
   sleep 5
   if [ "$i" -eq 30 ]; then
     echo "Frontend health check failed"
+    exit 1
+  fi
+done
+'''
+
+                    sh '''
+for i in $(seq 1 30); do
+  if curl -fsS "http://localhost:${NGINX_PORT}/" >/dev/null 2>&1; then
+    echo "Nginx is healthy."
+    break
+  fi
+  echo "Waiting for nginx health... ($i/30)"
+  sleep 5
+  if [ "$i" -eq 30 ]; then
+    echo "Nginx health check failed"
     exit 1
   fi
 done
