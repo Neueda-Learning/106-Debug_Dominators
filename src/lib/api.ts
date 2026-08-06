@@ -684,6 +684,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const token = getToken();
+  const buildHeaders = (authToken?: string | null) => ({
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(init?.headers ?? {}),
+  });
+
+  let res = await fetch(`${getApiBaseUrl()}${path}`, {
+    ...init,
+    headers: buildHeaders(token),
+  });
+
+  // Retry once without a stale token so anonymous endpoints can still work.
+  if (res.status === 401 && token) {
+    setToken(null);
+    res = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers: buildHeaders(null),
+    });
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    const body = text ? safeJson(text) : null;
+    const message =
+      (body && (body.message || body.error || body.detail)) ||
+      `${res.status} ${res.statusText || "Request failed"}`;
+    throw new Error(String(message));
+  }
+
+  return res.blob();
+}
+
 function safeJson(text: string) {
   try {
     return JSON.parse(text);
@@ -730,6 +763,11 @@ export const api = {
       request<SpringPaymentHistoryResponse[]>(`/payment-history/payment/${resolvedId}`).then(
         (rows) => rows.map(mapSpringPaymentHistory),
       ),
+    ),
+  // GET /api/statements/payment/{id}
+  downloadPaymentStatement: (id: number | string) =>
+    resolvePaymentLookupId(id).then((resolvedId) =>
+      requestBlob(`/statements/payment/${resolvedId}`),
     ),
   // POST /api/payments
   createPayment: (data: CreatePaymentRequest) =>
