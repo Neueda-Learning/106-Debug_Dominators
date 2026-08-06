@@ -748,11 +748,7 @@ export const api = {
     setToken(basic);
     setAuthUser({ userId: 1, email: safeUser, role: "USER" });
     setToken(basic);
-    try {
-      await request<SpringPaymentResponse[]>("/payments");
-    } catch (e) {
-      console.warn("Backend /payments check failed, continuing with active session token:", e);
-    }
+    return { ok: true};
   },
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
