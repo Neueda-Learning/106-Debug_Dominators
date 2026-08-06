@@ -93,7 +93,7 @@ fi
                 script {
                     def workDir = readFile(env.WORK_DIR_FILE).trim()
                     dir("${workDir}/Backend/payment-processing-system") {
-                        sh 'chmod +x mvnw && ./mvnw -B clean test'
+                        sh 'chmod +x mvnw && DB_USER=${MYSQL_USER:-fasterpay} DB_PASSWORD=${MYSQL_PASSWORD:-n3u3da!} ./mvnw -B clean test'
                     }
                 }
             }
@@ -143,7 +143,7 @@ fi
                     def envContent = """
 MYSQL_ROOT_PASSWORD=${env.MYSQL_ROOT_PASSWORD ?: 'n3u3da!'}
 MYSQL_DATABASE=${env.MYSQL_DATABASE ?: 'payment_db'}
-MYSQL_USER=${env.MYSQL_USER ?: 'root'}
+MYSQL_USER=${env.MYSQL_USER ?: 'fasterpay'}
 MYSQL_PASSWORD=${env.MYSQL_PASSWORD ?: 'n3u3da!'}
 MYSQL_PORT=${env.MYSQL_PORT ?: '13306'}
 BACKEND_PORT=${env.BACKEND_PORT ?: '18082'}
