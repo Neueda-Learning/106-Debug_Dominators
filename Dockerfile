@@ -3,8 +3,9 @@ FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-COPY pom.xml .
-COPY src ./src
+# Copy the backend project files
+COPY Backend/payment-processing-system/pom.xml .
+COPY Backend/payment-processing-system/src ./src
 
 RUN mvn clean package -DskipTests
 
