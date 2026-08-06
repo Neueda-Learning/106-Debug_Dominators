@@ -166,10 +166,37 @@ APP_CORS_ALLOWED_ORIGINS=${env.APP_CORS_ALLOWED_ORIGINS ?: "http://localhost:${e
                         sh "${composeCmd} --env-file .env down --volumes --remove-orphans || true"
                         sh "${composeCmd} --env-file .env pull || true"
                         sh """
-if ! ${composeCmd} --env-file .env up -d --build --remove-orphans; then
-  ${composeCmd} --env-file .env ps || true
-  ${composeCmd} --env-file .env logs --tail=200 backend mysql frontend || true
-  exit 1
+if ! ${composeCmd} --env-file .env up -d --build mysql; then
+    ${composeCmd} --env-file .env ps || true
+    ${composeCmd} --env-file .env logs --tail=200 mysql || true
+    exit 1
+fi
+
+MYSQL_CONTAINER="${COMPOSE_PROJECT_NAME}-mysql-1"
+for i in $(seq 1 40); do
+    MYSQL_STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${MYSQL_CONTAINER}" 2>/dev/null || true)
+    if [ "${MYSQL_STATUS}" = "healthy" ]; then
+        echo "MySQL is healthy."
+        break
+    fi
+    if [ "${MYSQL_STATUS}" = "exited" ] || [ "${MYSQL_STATUS}" = "dead" ]; then
+        echo "MySQL container is not running (status=${MYSQL_STATUS})."
+        ${composeCmd} --env-file .env logs --tail=200 mysql || true
+        exit 1
+    fi
+    echo "Waiting for MySQL health... (${i}/40, status=${MYSQL_STATUS:-starting})"
+    sleep 5
+    if [ "${i}" -eq 40 ]; then
+        echo "MySQL did not become healthy in time."
+        ${composeCmd} --env-file .env logs --tail=200 mysql || true
+        exit 1
+    fi
+done
+
+if ! ${composeCmd} --env-file .env up -d --build --remove-orphans backend frontend; then
+    ${composeCmd} --env-file .env ps || true
+    ${composeCmd} --env-file .env logs --tail=200 backend mysql frontend || true
+    exit 1
 fi
 """
                         sh "${composeCmd} --env-file .env ps"
