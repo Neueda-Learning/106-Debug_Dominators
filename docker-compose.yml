@@ -20,7 +20,9 @@ services:
       - springboot-network
 
   springboot-app:
-    build: .
+    build:
+      context: .
+      dockerfile: Backend/payment-processing-system/Dockerfile
     container_name: springboot_container
 
     depends_on:
@@ -37,6 +39,7 @@ services:
 
     networks:
       - springboot-network
+
   nginx:
     build:
       context: ./nginx
@@ -48,6 +51,7 @@ services:
       - springboot-app
     networks:
       - springboot-network
+
 volumes:
   mysql-data:
 
