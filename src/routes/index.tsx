@@ -242,10 +242,7 @@ function PaymentRow({ payment }: { payment: Payment }) {
       </TableCell>
       <TableCell className="text-right">
         <Button asChild variant="ghost" size="sm">
-          <Link
-            to="/payments/$paymentId"
-            params={{ paymentId: String(payment.paymentRef || payment.paymentId) }}
-          >
+          <Link to="/payments/details" state={{ paymentId: payment.paymentId }}>
             Details <ArrowRight className="ml-1 size-3.5" />
           </Link>
         </Button>

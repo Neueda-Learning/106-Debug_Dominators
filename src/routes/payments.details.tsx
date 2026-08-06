@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -26,7 +26,7 @@ import {
 } from "@/lib/api";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 
-export const Route = createFileRoute("/payments/$paymentId")({
+export const Route = createFileRoute("/payments/details")({
   head: () => ({
     meta: [
       { title: "Payment Detail & Status History — Payments Console" },
@@ -45,8 +45,15 @@ export const Route = createFileRoute("/payments/$paymentId")({
   component: PaymentDetailPage,
 });
 
+/** The payment identifier travels in browser history state, never in the URL. */
+function usePaymentIdFromState() {
+  return useRouterState({
+    select: (s) => s.location.state.paymentId,
+  });
+}
+
 function PaymentDetailPage() {
-  const { paymentId } = Route.useParams();
+  const paymentId = usePaymentIdFromState();
   const queryClient = useQueryClient();
   const [refundReason, setRefundReason] = useState<string>(REFUND_REASONS[0]);
   const [refundMethod, setRefundMethod] = useState<RefundMethod>("ORIGINAL_PAYMENT_METHOD");
@@ -54,24 +61,27 @@ function PaymentDetailPage() {
 
   const payment = useQuery({
     queryKey: ["payment", paymentId],
-    queryFn: () => api.getPayment(paymentId),
+    queryFn: () => api.getPayment(paymentId!),
+    enabled: paymentId !== undefined && paymentId !== null,
     retry: false,
   });
   const history = useQuery({
     queryKey: ["payment-history", paymentId],
-    queryFn: () => api.getPaymentHistory(paymentId),
+    queryFn: () => api.getPaymentHistory(paymentId!),
+    enabled: paymentId !== undefined && paymentId !== null,
     retry: false,
   });
 
   const refunds = useQuery({
     queryKey: ["refunds", paymentId],
-    queryFn: () => api.listRefunds(paymentId),
+    queryFn: () => api.listRefunds(paymentId!),
+    enabled: paymentId !== undefined && paymentId !== null,
     retry: false,
   });
 
   const requestRefund = useMutation({
     mutationFn: () =>
-      api.requestRefund(paymentId, { refundReason, refundMethod, remarks: remarks || null }),
+      api.requestRefund(paymentId!, { refundReason, refundMethod, remarks: remarks || null }),
     onSuccess: (r) => {
       toast.success(`Refund ${r.refundReference} requested`);
       queryClient.invalidateQueries({ queryKey: ["payment", paymentId] });
@@ -103,7 +113,18 @@ function PaymentDetailPage() {
           </Link>
         </Button>
 
-        {payment.isLoading ? (
+        {paymentId === undefined || paymentId === null ? (
+          <div className="panel flex items-start gap-3 p-6 text-sm">
+            <AlertTriangle className="mt-0.5 size-4 text-status-failed" />
+            <p className="text-muted-foreground">
+              No payment selected. Open a payment from the{" "}
+              <Link to="/" className="underline">
+                payments list
+              </Link>{" "}
+              to view its details.
+            </p>
+          </div>
+        ) : payment.isLoading ? (
           <Skeleton className="h-40 w-full" />
         ) : payment.isError ? (
           <div className="panel flex items-start gap-3 p-6 text-sm">
