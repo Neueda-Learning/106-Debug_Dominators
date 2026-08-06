@@ -18,8 +18,6 @@ payment-processing-system/
 |  |- README.md
 |  |- package.json
 |  `- src/
-|- src/
-|- pom.xml
 |- Dockerfile
 |- docker-compose.yml
 |- Jenkinsfile
