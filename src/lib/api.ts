@@ -106,6 +106,38 @@ export const USD_RATES: Record<string, number> = {
   XRP: 0.55,
 };
 
+export const CURRENCY_PRECISION: Record<string, number> = {
+  USD: 2,
+  EUR: 2,
+  GBP: 2,
+  INR: 2,
+  JPY: 2,
+  AUD: 2,
+  CAD: 2,
+  SGD: 2,
+  AED: 2,
+  CHF: 2,
+  BTC: 8,
+  ETH: 8,
+  USDT: 6,
+  USDC: 6,
+  SOL: 6,
+  XRP: 6,
+};
+
+export const DEFAULT_COUNTRY_BY_CURRENCY: Record<string, string> = {
+  USD: "US",
+  EUR: "DE",
+  GBP: "GB",
+  INR: "IN",
+  JPY: "JP",
+  AUD: "AU",
+  CAD: "CA",
+  SGD: "SG",
+  AED: "AE",
+  CHF: "CH",
+};
+
 /**
  * Tiered fee: free under $100 equivalent, 0.5% up to $1,000, 0.75% above.
  */
@@ -134,11 +166,25 @@ export const TAX_RATES: Record<string, number> = {
 };
 export const round2 = (n: number) => Math.round(n * 100) / 100;
 
+export function precisionForCurrency(currency?: string | null) {
+  return CURRENCY_PRECISION[currency ?? ""] ?? 2;
+}
+
+export function roundAmount(value: number, currency?: string | null) {
+  const precision = precisionForCurrency(currency);
+  const factor = 10 ** precision;
+  return Math.round(value * factor) / factor;
+}
+
+export function getDefaultCountryForCurrency(currency?: string | null) {
+  return DEFAULT_COUNTRY_BY_CURRENCY[currency ?? ""] ?? "US";
+}
+
 /** Convert between any two supported currencies using the indicative USD rates. */
 export function convertAmount(amount: number, from: string, to: string) {
   const usd = (Number(amount) || 0) * (USD_RATES[from] ?? 1);
   const rate = USD_RATES[to] ?? 1;
-  return round2(usd / rate);
+  return roundAmount(usd / rate, to);
 }
 
 export const isCryptoCurrency = (code: string) =>
@@ -281,6 +327,20 @@ type SpringPaymentResponse = {
   createdAt: string | null;
 };
 
+type LivePaymentMetadata = {
+  paymentId: number;
+  idempotencyKey: string;
+  paymentType: PaymentType;
+  settlementCurrencyCode: string | null;
+  feeAmount: number | null;
+  taxAmount: number | null;
+  netAmount: number | null;
+  exchangeRateId: number | null;
+  campaignId: number | null;
+  sourceCountry: string | null;
+  destinationCountry: string | null;
+};
+
 type SpringPaymentRequest = {
   sourceAccount: string;
   destinationAccount: string;
@@ -344,6 +404,7 @@ type SpringContributionResponse = {
 
 const BASE_KEY = "pp.apiBaseUrl";
 const TOKEN_KEY = "pp.jwt";
+const LIVE_PAYMENT_METADATA_KEY = "pp.livePaymentMetadata";
 export const DEFAULT_BASE_URL = "http://localhost:8082";
 
 export function getApiBaseUrl() {
@@ -369,30 +430,73 @@ function derivePaymentType(paymentMethod: PaymentMethod): PaymentType {
   return paymentMethod === "CRYPTO" ? "CRYPTO" : "NORMAL";
 }
 
+function readLivePaymentMetadata(): Record<string, LivePaymentMetadata> {
+  if (typeof window === "undefined") return {};
+  const raw = localStorage.getItem(LIVE_PAYMENT_METADATA_KEY);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Record<string, LivePaymentMetadata>;
+  } catch {
+    return {};
+  }
+}
+
+function writeLivePaymentMetadata(store: Record<string, LivePaymentMetadata>) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LIVE_PAYMENT_METADATA_KEY, JSON.stringify(store));
+}
+
+function getLivePaymentMetadata(paymentId: number) {
+  return readLivePaymentMetadata()[String(paymentId)] ?? null;
+}
+
+function saveLivePaymentMetadata(paymentId: number, data: CreatePaymentRequest) {
+  const store = readLivePaymentMetadata();
+  store[String(paymentId)] = {
+    paymentId,
+    idempotencyKey: data.idempotencyKey,
+    paymentType: data.paymentType,
+    settlementCurrencyCode: data.settlementCurrencyCode ?? data.sourceCurrencyCode,
+    feeAmount: data.feeAmount ?? null,
+    taxAmount: data.taxAmount ?? null,
+    netAmount: roundAmount(
+      Number(data.amount) + Number(data.feeAmount ?? 0) + Number(data.taxAmount ?? 0),
+      data.sourceCurrencyCode,
+    ),
+    exchangeRateId: data.exchangeRateId ?? null,
+    campaignId: data.campaignId ?? null,
+    sourceCountry: data.sourceCountry ?? null,
+    destinationCountry: data.destinationCountry ?? null,
+  };
+  writeLivePaymentMetadata(store);
+  return store[String(paymentId)];
+}
+
 function mapSpringPayment(payment: SpringPaymentResponse): Payment {
+  const metadata = getLivePaymentMetadata(payment.id);
   return {
     paymentId: payment.id,
     paymentRef: payment.paymentId || payment.referenceNumber,
     externalPaymentRef: payment.referenceNumber || null,
-    idempotencyKey: "",
+    idempotencyKey: metadata?.idempotencyKey ?? "",
     payerAccountId: 0,
     payeeAccountId: null,
-    campaignId: null,
-    paymentType: derivePaymentType(payment.paymentMethod),
+    campaignId: metadata?.campaignId ?? null,
+    paymentType: metadata?.paymentType ?? derivePaymentType(payment.paymentMethod),
     paymentMethod: payment.paymentMethod,
     status: payment.status,
     amount: payment.amount,
-    feeAmount: null,
-    taxAmount: null,
-    netAmount: payment.amount,
+    feeAmount: metadata?.feeAmount ?? null,
+    taxAmount: metadata?.taxAmount ?? null,
+    netAmount: metadata?.netAmount ?? payment.amount,
     sourceCurrencyCode: payment.currency,
-    settlementCurrencyCode: payment.currency,
-    exchangeRateId: null,
+    settlementCurrencyCode: metadata?.settlementCurrencyCode ?? payment.currency,
+    exchangeRateId: metadata?.exchangeRateId ?? null,
     description: payment.description,
     sourceAccount: payment.sourceAccount,
     destinationAccount: payment.destinationAccount,
-    sourceCountry: payment.sourceCountry,
-    destinationCountry: payment.destinationCountry,
+    sourceCountry: metadata?.sourceCountry ?? payment.sourceCountry,
+    destinationCountry: metadata?.destinationCountry ?? payment.destinationCountry,
     initiatedAt: payment.createdAt,
     completedAt: payment.status === "COMPLETED" ? payment.createdAt : null,
     failedAt: payment.status === "FAILED" ? payment.createdAt : null,
@@ -632,7 +736,10 @@ export const api = {
       : request<SpringPaymentResponse>("/payments", {
           method: "POST",
           body: JSON.stringify(mapCreatePaymentRequest(data)),
-        }).then(mapSpringPayment),
+        }).then((payment) => {
+          saveLivePaymentMetadata(payment.id, data);
+          return mapSpringPayment(payment);
+        }),
   // PUT /api/payments/{id}/status
   updatePaymentStatus: (
     id: number | string,
@@ -728,7 +835,11 @@ export function formatAmount(value: string | number | null | undefined, currency
   if (value === null || value === undefined || value === "") return "—";
   const n = Number(value);
   if (Number.isNaN(n)) return String(value);
-  return `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${
+  const precision = precisionForCurrency(currency);
+  return `${n.toLocaleString(undefined, {
+    minimumFractionDigits: precision === 2 ? 2 : 0,
+    maximumFractionDigits: precision,
+  })}${
     currency ? ` ${currency}` : ""
   }`;
 }

@@ -35,9 +35,11 @@ import {
   api,
   convertAmount,
   feeRateFor,
+  formatAmount,
+  getDefaultCountryForCurrency,
   isCryptoCurrency,
   isDemoMode,
-  round2,
+  roundAmount,
   type PaymentOptionId,
   type CreatePaymentRequest,
   type Payment,
@@ -125,16 +127,21 @@ export function CreatePaymentDialog({
   const settlementIsCrypto = isCryptoCurrency(settlementCurrencyCode);
   const cryptoNeedsBank = cryptoMode && !settlementIsCrypto;
   const needsBankDetails = bankMode_ || cryptoNeedsBank;
+  const hideCountryFields = isCryptoCurrency(sourceCurrencyCode) || settlementIsCrypto;
 
   const feeRate = feeRateFor(amount, sourceCurrencyCode);
   const taxRate = TAX_RATES[sourceCurrencyCode] ?? 0;
 
   const { feeAmount, taxAmount, total } = useMemo(() => {
     const base = Math.max(0, Number(amount) || 0);
-    const fee = round2((base * feeRate) / 100);
-    const tax = round2((base * taxRate) / 100);
-    return { feeAmount: fee, taxAmount: tax, total: round2(base + fee + tax) };
-  }, [amount, feeRate, taxRate]);
+    const fee = roundAmount((base * feeRate) / 100, sourceCurrencyCode);
+    const tax = roundAmount((base * taxRate) / 100, sourceCurrencyCode);
+    return {
+      feeAmount: fee,
+      taxAmount: tax,
+      total: roundAmount(base + fee + tax, sourceCurrencyCode),
+    };
+  }, [amount, feeRate, sourceCurrencyCode, taxRate]);
 
   const settlementAmount = useMemo(
     () => convertAmount(amount, sourceCurrencyCode, settlementCurrencyCode),
@@ -157,12 +164,35 @@ export function CreatePaymentDialog({
     return `upi://pay?${params.toString()}`;
   }, [upiId, total, sourceCurrencyCode, description]);
 
+  useEffect(() => {
+    if (isCryptoCurrency(sourceCurrencyCode)) {
+      setSourceCountry("");
+      return;
+    }
+    setSourceCountry(getDefaultCountryForCurrency(sourceCurrencyCode));
+  }, [sourceCurrencyCode]);
+
+  useEffect(() => {
+    if (settlementIsCrypto) {
+      setDestinationCountry("");
+      return;
+    }
+    setDestinationCountry(getDefaultCountryForCurrency(settlementCurrencyCode));
+  }, [settlementCurrencyCode, settlementIsCrypto]);
+
   const onOptionChange = (id: PaymentOptionId) => {
     setOptionId(id);
     const next = PAYMENT_OPTIONS.find((o) => o.id === id)!;
     const nextCrypto = next.paymentMethod === "CRYPTO";
     setBankMode(id === "BANK_INTERNATIONAL" ? "SWIFT" : "NEFT");
     setSourceCurrencyCode((cur) => {
+      const isCryptoCur = (cryptoCurrencies as readonly string[]).includes(cur);
+      if (nextCrypto && !isCryptoCur) return "BTC";
+      if (!nextCrypto && isCryptoCur) return "USD";
+      if (id === "UPI") return "INR";
+      return cur;
+    });
+    setSettlementCurrencyCode((cur) => {
       const isCryptoCur = (cryptoCurrencies as readonly string[]).includes(cur);
       if (nextCrypto && !isCryptoCur) return "BTC";
       if (!nextCrypto && isCryptoCur) return "USD";
@@ -203,8 +233,8 @@ export function CreatePaymentDialog({
         settlementCurrencyCode,
         sourceAccount,
         destinationAccount,
-        sourceCountry,
-        destinationCountry,
+        sourceCountry: hideCountryFields ? undefined : sourceCountry,
+        destinationCountry: hideCountryFields ? undefined : destinationCountry,
         description: [description.trim(), detail].filter(Boolean).join(" — "),
         feeAmount,
         taxAmount,
@@ -249,7 +279,7 @@ export function CreatePaymentDialog({
                   : "Waiting for payment confirmation…"}
             </DialogTitle>
             <DialogDescription>
-              {awaitingPayment.paymentRef} · {total} {sourceCurrencyCode} to{" "}
+              {awaitingPayment.paymentRef} · {formatAmount(total, sourceCurrencyCode)} to{" "}
               {upiId.trim() || "fasterpay@upi"}
             </DialogDescription>
           </DialogHeader>
@@ -341,7 +371,7 @@ export function CreatePaymentDialog({
             <Input
               type="number"
               min={0}
-              step="0.01"
+              step={isCryptoCurrency(sourceCurrencyCode) ? "0.00000001" : "0.01"}
               value={amount}
               onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
             />
@@ -392,21 +422,27 @@ export function CreatePaymentDialog({
             </Select>
           </Field>
 
-          <Field label="Source country" hint="ISO country code">
-            <Input
-              value={sourceCountry}
-              onChange={(e) => setSourceCountry(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="US"
-            />
-          </Field>
+          {!hideCountryFields ? (
+            <>
+              <Field label="Source country" hint="auto from source currency">
+                <Input
+                  value={sourceCountry}
+                  onChange={(e) => setSourceCountry(e.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="US"
+                />
+              </Field>
 
-          <Field label="Destination country" hint="ISO country code">
-            <Input
-              value={destinationCountry}
-              onChange={(e) => setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))}
-              placeholder="IN"
-            />
-          </Field>
+              <Field label="Destination country" hint="auto from settlement currency">
+                <Input
+                  value={destinationCountry}
+                  onChange={(e) =>
+                    setDestinationCountry(e.target.value.toUpperCase().slice(0, 2))
+                  }
+                  placeholder="IN"
+                />
+              </Field>
+            </>
+          ) : null}
 
           {/* Method-specific details */}
           {bankMode_ ? (
@@ -457,11 +493,11 @@ export function CreatePaymentDialog({
                 <div className="sm:col-span-2 grid gap-1 border-t border-border pt-2">
                   <Row
                     label={`Converted amount (${sourceCurrencyCode} → ${settlementCurrencyCode})`}
-                    value={`${settlementAmount} ${settlementCurrencyCode}`}
+                    value={formatAmount(settlementAmount, settlementCurrencyCode)}
                   />
                   <Row
                     label="Bank credit incl. fee & tax"
-                    value={`${settlementTotal} ${settlementCurrencyCode}`}
+                    value={formatAmount(settlementTotal, settlementCurrencyCode)}
                     strong
                   />
                   <p className="text-xs text-muted-foreground">
@@ -520,7 +556,7 @@ export function CreatePaymentDialog({
                 <p className="text-xs text-muted-foreground">
                   Scan to pay{" "}
                   <span className="font-mono text-foreground">
-                    {total} {sourceCurrencyCode}
+                    {formatAmount(total, sourceCurrencyCode)}
                   </span>{" "}
                   (total charged). The QR updates as the amount changes.
                 </p>
@@ -552,9 +588,9 @@ export function CreatePaymentDialog({
           ) : null}
 
           <div className="sm:col-span-2 grid gap-2 rounded-md border border-border p-3 text-sm">
-            <Row label={`Fee (${feeRate}%)`} value={`${feeAmount} ${sourceCurrencyCode}`} />
-            <Row label={`Tax (${taxRate}%)`} value={`${taxAmount} ${sourceCurrencyCode}`} />
-            <Row label="Total charged" value={`${total} ${sourceCurrencyCode}`} strong />
+            <Row label={`Fee (${feeRate}%)`} value={formatAmount(feeAmount, sourceCurrencyCode)} />
+            <Row label={`Tax (${taxRate}%)`} value={formatAmount(taxAmount, sourceCurrencyCode)} />
+            <Row label="Total charged" value={formatAmount(total, sourceCurrencyCode)} strong />
             <p className="text-xs text-muted-foreground">
               Fee tiers: 0% under $100 equivalent, 0.5% up to $1,000, 0.75% above.
             </p>
