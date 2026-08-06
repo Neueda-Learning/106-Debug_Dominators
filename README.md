@@ -1,54 +1,95 @@
-# Frontend Foundations Kit
+# FasterPay - Payment Processing System
 
-Build me a frontend react page and all the backend details are in the zip like the schema .sql and how the api structure should also be there
+FasterPay is a full-stack payment processing application with a Spring Boot backend and a modern frontend. It supports payment lifecycle operations, refunds, notifications, audit logs, campaigns/contributions, crypto payments, retry flow, and statement generation.
 
-This project was built with [Lovable](https://lovable.dev).
+## Repository Structure
 
-## Build with Lovable
+```text
+payment-processing-system/
+|- Backend/
+|  |- README.md
+|  `- payment-processing-system/
+|     |- pom.xml
+|     |- mvnw
+|     |- mvnw.cmd
+|     |- .mvn/
+|     `- src/
+|- Frontend/
+|  |- README.md
+|  |- package.json
+|  `- src/
+|- src/
+|- pom.xml
+|- Dockerfile
+|- docker-compose.yml
+|- Jenkinsfile
+`- start.sh
+```
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/ffb15abc-dd91-4a46-a82e-006b9e457ff7).
+## Tech Stack
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- Backend: Java 17, Spring Boot, Spring Data JDBC, Spring Security, MySQL
+- Docs and PDF: springdoc-openapi, OpenPDF
+- Frontend: React + TypeScript + Vite
+- DevOps: Docker, Docker Compose, Jenkins
 
-## Development
+## Quick Start
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+### 1) Backend (local)
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+From repository root:
+
+```powershell
+.\mvnw.cmd clean test
+.\mvnw.cmd spring-boot:run
+```
+
+Backend default port in config: `8082`
+
+### 2) Frontend (local)
+
+```powershell
+Set-Location .\Frontend
+npm install
 npm run dev
 ```
 
-## Jenkins, Docker, and EC2 Deployment
+### 3) Docker (full stack)
 
-The startup flow now supports environment-based port and origin configuration to avoid collisions across parallel jobs/containers.
-
-### Environment Variables
-
-- `BACKEND_PORT` (default: `8082`)
-- `FRONTEND_PORT` (default: `5173`)
-- `FRONTEND_HOST` (default: `127.0.0.1`, use `0.0.0.0` on EC2)
-- `API_BASE_URL` (default: `http://localhost:${BACKEND_PORT}`)
-- `SERVER_PORT` (Spring Boot port override, default: `8082`)
-- `APP_CORS_ALLOWED_ORIGINS` mapped to `app.cors.allowed-origins` (comma-separated list)
-
-### Example: Local with custom ports
-
-```sh
-BACKEND_PORT=18082 FRONTEND_PORT=15173 API_BASE_URL=http://localhost:18082 ./start.sh
+```powershell
+docker compose up --build
 ```
 
-### Example: EC2
+## Configuration
 
-```sh
-BACKEND_PORT=8082 \
-FRONTEND_PORT=8081 \
-FRONTEND_HOST=0.0.0.0 \
-API_BASE_URL=http://<EC2_PUBLIC_DNS_OR_IP>:8082 \
-APP_CORS_ALLOWED_ORIGINS=http://<EC2_PUBLIC_DNS_OR_IP>:8081 \
-./start.sh
+Backend properties are in:
+
+- `src/main/resources/application.properties`
+- `Backend/payment-processing-system/src/main/resources/application.properties`
+
+Main keys you will likely adjust:
+
+- `spring.datasource.url`
+- `spring.datasource.username`
+- `spring.datasource.password`
+- `server.port`
+- `app.cors.allowed-origins`
+
+## Testing
+
+Run all backend tests:
+
+```powershell
+.\mvnw.cmd test
 ```
+
+Surefire reports are generated under `target/surefire-reports`.
+
+## API Documentation
+
+Swagger/OpenAPI UI is enabled via springdoc. URL depends on your active backend config and server port.
+
+## Module Docs
+
+- Backend details: `Backend/README.md`
+- Frontend details: `Frontend/README.md`
