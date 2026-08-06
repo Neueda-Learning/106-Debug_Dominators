@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -11,10 +11,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { api, formatAmount, formatDateTime } from "@/lib/api";
+import { api, formatAmount, formatDateTime, getToken } from "@/lib/api";
 import { AlertTriangle, HeartHandshake } from "lucide-react";
 
 export const Route = createFileRoute("/crowdfunding")({
+  beforeLoad: () => {
+    if (!getToken()) {
+      throw redirect({ to: "/login" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "FasterPay CrowdFunding" },

@@ -420,6 +420,11 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+function toAuthorizationValue(token: string) {
+  if (/^(Bearer|Basic)\s+/i.test(token)) return token;
+  return `Bearer ${token}`;
+}
+
 const USER_KEY = "pp.user";
 export type AuthUser = { userId: number; email: string; role: string };
 
@@ -655,7 +660,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const buildHeaders = (authToken?: string | null) => ({
     "Content-Type": "application/json",
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(authToken ? { Authorization: toAuthorizationValue(authToken) } : {}),
     ...(init?.headers ?? {}),
   });
 
@@ -687,7 +692,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   const token = getToken();
   const buildHeaders = (authToken?: string | null) => ({
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(authToken ? { Authorization: toAuthorizationValue(authToken) } : {}),
     ...(init?.headers ?? {}),
   });
 
@@ -729,11 +734,24 @@ function safeJson(text: string) {
 
 export const api = {
 
-  // POST /api/auth/login
-  login: (email: string, password: string) =>
-    Promise.reject(
-      new Error("The Spring backend does not expose auth endpoints. Use direct API access."),
-    ),
+  // The Spring backend uses HTTP Basic auth. We validate credentials by
+  // calling a protected endpoint after storing the Basic token.
+  login: async (username: string, password: string) => {
+    if (typeof window === "undefined") {
+      throw new Error("Login is only available in the browser.");
+    }
+    const basic = `Basic ${window.btoa(`${username}:${password}`)}`;
+    setToken(basic);
+    try {
+      await request<SpringPaymentResponse[]>("/payments");
+      setAuthUser({ userId: 1, email: username, role: "USER" });
+      return { ok: true };
+    } catch (error) {
+      setToken(null);
+      setAuthUser(null);
+      throw error;
+    }
+  },
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
     Promise.reject(
