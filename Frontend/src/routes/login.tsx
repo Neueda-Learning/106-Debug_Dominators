@@ -23,8 +23,8 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("debug");
+  const [password, setPassword] = useState("n3u3da!");
 
   const loginMutation = useMutation({
     mutationFn: () => api.login(username, password),
