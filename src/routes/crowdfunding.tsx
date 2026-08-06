@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,7 @@ export const Route = createFileRoute("/crowdfunding")({
 const PRESETS = ["100", "250", "500", "custom"];
 
 function CrowdfundingPage() {
-  const [campaignInput, setCampaignInput] = useState("1");
-  const [campaignId, setCampaignId] = useState("1");
+  const [campaignId, setCampaignId] = useState("");
   const [preset, setPreset] = useState("100");
   const [customAmount, setCustomAmount] = useState("");
   const [contributorId, setContributorId] = useState("1");
@@ -45,25 +44,48 @@ function CrowdfundingPage() {
   const [anonymous, setAnonymous] = useState(false);
   const queryClient = useQueryClient();
 
+  const campaigns = useQuery({
+    queryKey: ["campaigns"],
+    queryFn: () => api.listCampaigns(),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (campaignId || !campaigns.data?.length) return;
+    setCampaignId(String(campaigns.data[0].id));
+  }, [campaignId, campaigns.data]);
+
   const campaign = useQuery({
     queryKey: ["campaign", campaignId],
     queryFn: () => api.getCampaign(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
   const progress = useQuery({
     queryKey: ["campaign-progress", campaignId],
     queryFn: () => api.getCampaignProgress(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
   const contributions = useQuery({
     queryKey: ["campaign-contributions", campaignId],
     queryFn: () => api.getContributions(campaignId),
+    enabled: !!campaignId,
     retry: false,
   });
 
   const amount = preset === "custom" ? Number(customAmount) : Number(preset);
   const remaining = progress.data ? Number(progress.data.remainingAmount) : null;
   const pct = progress.data ? Math.min(100, Number(progress.data.progressPercentage) || 0) : 0;
+  const campaignIds = (campaigns.data ?? []).map((item) => String(item.id));
+  const campaignIndex = campaignIds.indexOf(campaignId);
+
+  const goToCampaign = (index: number) => {
+    if (index < 0 || index >= campaignIds.length) {
+      return;
+    }
+    setCampaignId(campaignIds[index]);
+  };
 
   const contribute = useMutation({
     mutationFn: () =>
@@ -92,32 +114,24 @@ function CrowdfundingPage() {
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mono-tag">GET /api/crowdfunding/campaigns/{"{id}"}</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">FasterPay CrowdFunding</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Track a campaign's progress and record contributions against it.
             </p>
           </div>
-          <div className="flex items-end gap-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Campaign ID</Label>
-              <Input
-                className="w-28"
-                value={campaignInput}
-                onChange={(e) => setCampaignInput(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" onClick={() => setCampaignId(campaignInput || "1")}>
-              Load
-            </Button>
-          </div>
         </div>
 
-        {campaign.isError || progress.isError ? (
+        {campaigns.isSuccess && campaigns.data.length === 0 ? (
+          <div className="panel mt-8 p-6 text-sm text-muted-foreground">
+            No campaigns were found in the database.
+          </div>
+        ) : null}
+
+        {campaigns.isError || campaign.isError || progress.isError ? (
           <div className="panel mt-8 flex items-start gap-3 p-6 text-sm">
             <AlertTriangle className="mt-0.5 size-4 text-status-failed" />
             <p className="text-muted-foreground">
-              {((campaign.error ?? progress.error) as Error)?.message}
+              {((campaigns.error ?? campaign.error ?? progress.error) as Error)?.message}
             </p>
           </div>
         ) : null}
@@ -165,9 +179,6 @@ function CrowdfundingPage() {
             ) : null}
 
             <div className="mt-8 border-t border-border pt-6">
-              <p className="mono-tag">
-                GET /api/crowdfunding/campaigns/{campaignId}/contributions
-              </p>
               <h3 className="mt-1.5 text-base font-semibold">Contribution history</h3>
               {contributions.isLoading ? (
                 <Skeleton className="mt-4 h-20 w-full" />
@@ -192,11 +203,39 @@ function CrowdfundingPage() {
                   ))}
                 </ul>
               )}
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToCampaign(campaignIndex - 1)}
+                  disabled={campaignIndex <= 0}
+                >
+                  &lt;
+                </Button>
+                {campaignIds.map((id) => (
+                  <Button
+                    key={id}
+                    variant={campaignId === id ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCampaignId(id)}
+                  >
+                    {id}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToCampaign(campaignIndex + 1)}
+                  disabled={campaignIndex === -1 || campaignIndex >= campaignIds.length - 1}
+                >
+                  &gt;
+                </Button>
+              </div>
             </div>
           </div>
 
           <div className="panel h-fit p-6">
-            <p className="mono-tag">POST /campaigns/{campaignId}/contributions</p>
             <h2 className="mt-1.5 flex items-center gap-2 text-lg font-semibold">
               <HeartHandshake className="size-4 text-primary" /> Contribute
             </h2>

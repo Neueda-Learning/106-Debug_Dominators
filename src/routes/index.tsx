@@ -30,7 +30,7 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/api";
-import { CURRENT_USER, accountName, mockApi } from "@/lib/mock";
+import { accountName } from "@/lib/mock";
 
 import { AlertTriangle, ArrowRight, Plus, RefreshCw, Search } from "lucide-react";
 
@@ -100,25 +100,13 @@ function PaymentsPage() {
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="mono-tag">GET /api/payments</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              {CURRENT_USER.name}'s payments
-            </h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Payments</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               CREATED → VALIDATED → PROCESSING → COMPLETED, with FAILED possible at any stage.
               Failed payments can be refunded.
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                mockApi.resetDemoData();
-                query.refetch();
-              }}
-            >
-              Reset demo data
-            </Button>
             <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
               <RefreshCw className={`mr-1.5 size-4 ${query.isFetching ? "animate-spin" : ""}`} />
               Refresh
@@ -224,6 +212,23 @@ function PaymentsPage() {
 }
 
 function PaymentRow({ payment }: { payment: Payment }) {
+  const resolveParty = (raw: string | null | undefined, id: number | null | undefined, fallback: string) => {
+    const direct = raw?.trim();
+    if (direct) {
+      if (/^\d+$/.test(direct)) {
+        return accountName(Number(direct));
+      }
+      return direct;
+    }
+    if (id && id > 0) return accountName(id);
+    return fallback;
+  };
+
+  const payerLabel =
+    resolveParty(payment.sourceAccount, payment.payerAccountId, "Unknown payer");
+  const payeeLabel =
+    resolveParty(payment.destinationAccount, payment.payeeAccountId, "Unknown payee");
+
   return (
     <TableRow>
       <TableCell>
@@ -231,8 +236,8 @@ function PaymentRow({ payment }: { payment: Payment }) {
         <div className="mono-tag">#{payment.paymentId}</div>
       </TableCell>
       <TableCell className="text-xs">
-        <div>{accountName(payment.payerAccountId)}</div>
-        <div className="text-muted-foreground">→ {accountName(payment.payeeAccountId)}</div>
+        <div>{payerLabel}</div>
+        <div className="text-muted-foreground">→ {payeeLabel}</div>
       </TableCell>
       <TableCell>
 

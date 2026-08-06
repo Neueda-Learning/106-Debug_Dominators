@@ -418,6 +418,10 @@ export const mockApi = {
     if (!campaign) throw new Error("No campaigns available");
     return delay({ ...campaign });
   },
+  async listCampaigns() {
+    const store = load();
+    return delay([...store.campaigns]);
+  },
   async getCampaignProgress(id: number | string) {
     const campaign = await mockApi.getCampaign(id);
     const target = Number(campaign.targetAmount);

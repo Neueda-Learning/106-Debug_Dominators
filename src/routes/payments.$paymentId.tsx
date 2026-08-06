@@ -86,6 +86,20 @@ function PaymentDetailPage() {
 
   const p = payment.data;
 
+  const resolveParty = (
+    rawAccount: string | null | undefined,
+    id: number | null | undefined,
+    fallback: string,
+  ) => {
+    const raw = rawAccount?.trim();
+    if (raw) {
+      if (/^\d+$/.test(raw)) return accountName(Number(raw));
+      return raw;
+    }
+    if (id && id > 0) return accountName(id);
+    return fallback;
+  };
+
   return (
     <div className="min-h-screen">
       <AppHeader />
@@ -108,7 +122,6 @@ function PaymentDetailPage() {
             <div className="panel p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="mono-tag">GET /api/payments/{p.paymentId}</p>
                   <h1 className="mt-2 font-mono text-2xl font-semibold tracking-tight">
                     {p.paymentRef}
                   </h1>
@@ -127,9 +140,15 @@ function PaymentDetailPage() {
               <div className="mt-6 grid gap-x-8 gap-y-4 border-t border-border pt-6 sm:grid-cols-2 lg:grid-cols-3">
                 <Detail label="Payment type" value={p.paymentType} />
                 <Detail label="Payment method" value={p.paymentMethod} />
-                <Detail label="Idempotency key" value={p.idempotencyKey} mono />
-                <Detail label="Paid from" value={accountName(p.payerAccountId)} />
-                <Detail label="Paid to" value={accountName(p.payeeAccountId)} />
+                <Detail label="Idempotency key" value={p.idempotencyKey || "—"} mono />
+                <Detail
+                  label="Paid from"
+                  value={resolveParty(p.sourceAccount, p.payerAccountId, "—")}
+                />
+                <Detail
+                  label="Paid to"
+                  value={resolveParty(p.destinationAccount, p.payeeAccountId, "—")}
+                />
                 <Detail label="Campaign" value={p.campaignId ?? "—"} />
                 <Detail label="Fee" value={formatAmount(p.feeAmount, p.sourceCurrencyCode)} />
                 <Detail label="Tax" value={formatAmount(p.taxAmount, p.sourceCurrencyCode)} />
@@ -145,7 +164,6 @@ function PaymentDetailPage() {
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
               <div className="panel p-6">
-                <p className="mono-tag">GET /api/payments/{p.paymentId}/history</p>
                 <h2 className="mt-1.5 text-lg font-semibold">Status history</h2>
 
                 {history.isLoading ? (
@@ -191,7 +209,6 @@ function PaymentDetailPage() {
               </div>
 
               <div className="panel h-fit p-6">
-                <p className="mono-tag">POST /api/payments/{p.paymentId}/refunds</p>
                 <h2 className="mt-1.5 text-lg font-semibold">Refund</h2>
 
                 {(refunds.data ?? []).length > 0 ? (
