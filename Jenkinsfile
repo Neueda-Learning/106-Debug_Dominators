@@ -43,8 +43,9 @@ pipeline {
                 sh 'docker rm -f springboot_container || true'
                 sh 'docker rm -f frontend_container || true'
 
-                // Remove ANY container using port 8085 (fixes your current error)
+                // Remove ANY container using ports 8085 or 8082
                 sh 'docker rm -f $(docker ps -aq --filter "publish=8085") || true'
+                sh 'docker rm -f $(docker ps -aq --filter "publish=8082") || true'
 
                 // Deploy fresh containers
                 sh 'docker-compose up -d'
