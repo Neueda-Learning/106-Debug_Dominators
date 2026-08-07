@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         GIT_URL = 'https://github.com/Neueda-Learning/106-Debug_Dominators.git'
-        BRANCH = 'restore-old-version'
+        BRANCH = 'main'
     }
 
     stages {
