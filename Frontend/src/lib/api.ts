@@ -408,7 +408,13 @@ export const DEFAULT_BASE_URL = ENV_DEFAULT_BASE_URL || "http://localhost:8082";
 
 export function getApiBaseUrl() {
   if (typeof window === "undefined") return DEFAULT_BASE_URL;
-  return localStorage.getItem(BASE_KEY)?.replace(/\/$/, "") || DEFAULT_BASE_URL;
+  const stored = localStorage.getItem(BASE_KEY);
+  if (stored) return stored.replace(/\/$/, "");
+  if (ENV_DEFAULT_BASE_URL) return ENV_DEFAULT_BASE_URL.replace(/\/$/, "");
+  
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:8082`;
 }
 export function setApiBaseUrl(url: string) {
   localStorage.setItem(BASE_KEY, url.replace(/\/$/, ""));
@@ -743,12 +749,11 @@ export const api = {
       throw new Error("Login is only available in the browser.");
     }
     const safeUser = username.trim() || "debug";
-    const safePass = password || "n3u3da!";
+    const safePass = password || "admin";
     const basic = `Basic ${window.btoa(`${safeUser}:${safePass}`)}`;
     setToken(basic);
     setAuthUser({ userId: 1, email: safeUser, role: "USER" });
-    setToken(basic);
-    return { ok: true};
+    return { ok: true };
   },
   // POST /api/auth/register
   register: (data: { firstName: string; lastName: string; email: string; password: string }) =>
