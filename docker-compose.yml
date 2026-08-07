@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: N3u3da!
-      MYSQL_DATABASE: payment_processing
+      MYSQL_DATABASE: payment_db
     ports:
       - "3306:3306"
     volumes:
@@ -24,7 +24,7 @@ services:
       - mysql
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      DB_URL: jdbc:mysql://mysql:3306/payment_processing
+      DB_URL: jdbc:mysql://mysql:3306/payment_db
       DB_USER: root
       DB_PASS: N3u3da!
     ports:
