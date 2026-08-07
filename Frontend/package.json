@@ -4,12 +4,12 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "node ./node_modules/vite/bin/vite.js",
-    "build": "node ./node_modules/vite/bin/vite.js build",
-    "build:dev": "node ./node_modules/vite/bin/vite.js build --mode development",
-    "preview": "node ./node_modules/vite/bin/vite.js preview",
-    "lint": "eslint .",
-    "format": "prettier --write ."
+  "dev": "node ./node_modules/vite/bin/vite.js",
+  "build": "tsr build --static",
+  "build:dev": "tsr build --static --mode development",
+  "preview": "node ./node_modules/vite/bin/vite.js preview",
+  "lint": "eslint .",
+  "format": "prettier --write ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
