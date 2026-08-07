@@ -12,6 +12,7 @@ COPY package*.json ./
 
 # Install dependencies (including TanStack Start CLI)
 RUN npm install
+RUN npm install @tanstack/start
 
 # Copy the rest of the frontend code
 COPY . .
