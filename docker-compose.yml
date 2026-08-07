@@ -1,96 +1,56 @@
-version: "3.9"
+version: "3.8"
 
 services:
   mysql:
-    image: mysql:8.0
-    restart: unless-stopped
+    image: mysql:8.4
+    container_name: mysql_container
+    restart: always
+
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-n3u3da!}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-payment_db}
-      MYSQL_USER: ${MYSQL_USER:-fasterpay}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-n3u3da!}
+      MYSQL_ROOT_PASSWORD: Neueda@123
+      MYSQL_DATABASE: company
+
     ports:
-      - "${MYSQL_PORT:-13306}:3306"
+      - "3306:3306"
+
     volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - fasterpay-network
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u",
-          "root",
-          "-p${MYSQL_ROOT_PASSWORD:-n3u3da!}",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      - mysql-data:/var/lib/mysql
 
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: backend
-    restart: unless-stopped
+    networks:
+      - springboot-network
+
+  springboot-app:
+    build: .
+    target: backend
+    container_name: springboot_container
+
+    depends_on:
+      - mysql
+
     environment:
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_NAME: ${MYSQL_DATABASE:-payment_db}
-      DB_USER: ${MYSQL_USER:-fasterpay}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-n3u3da!}
-      SERVER_PORT: 8082
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_PORT:-18081}}
       SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "${BACKEND_PORT:-18082}:8082"
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - fasterpay-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/v3/api-docs >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
+      DB_URL: jdbc:mysql://mysql:3306/payment_db
+      DB_USER: root
+      DB_PASS: Neueda@123
 
-  frontend:
+    ports:
+      - "8082:8082"
+
+    networks:
+      - springboot-network
+  nginx:
     build:
-      context: .
+      context: ./Frontend
       dockerfile: Dockerfile
-      target: frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${BACKEND_PORT:-18082}}
-    restart: unless-stopped
-    environment:
-      NITRO_HOST: 0.0.0.0
-      NITRO_PORT: 3000
-      PORT: 3000
+    container_name: nginx-server
     ports:
-      - "${FRONTEND_PORT:-18081}:3000"
+      - "8085:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - springboot-app
     networks:
-      - fasterpay-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
+      - springboot-network
 volumes:
-  mysql_data:
-    driver: local
+  mysql-data:
 
 networks:
-  fasterpay-network:
-    driver: bridge
+  springboot-network:
