@@ -11,7 +11,6 @@ RUN npm install
 
 COPY . .
 
-# Build using Vite (your actual framework)
 RUN npm run build
 
 # ---------- Runtime Stage ----------
@@ -19,7 +18,6 @@ FROM nginx:alpine
 
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy Vite build output
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
