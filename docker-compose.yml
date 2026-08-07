@@ -21,7 +21,6 @@ services:
 
   springboot-app:
     build: .
-    target: backend
     container_name: springboot_container
 
     depends_on:
